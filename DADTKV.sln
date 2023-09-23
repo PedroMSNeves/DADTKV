@@ -5,9 +5,9 @@ VisualStudioVersion = 17.7.34024.191
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Client", "Client\Client.csproj", "{B2CB6CD1-AA3A-432E-8F61-5C21256648CF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DADTKV Client Lib", "DADTKV Client Lib\DADTKV Client Lib.csproj", "{C5D89022-53FF-4551-AC43-66D388A0B74F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DADTKV Client Lib", "DADTKV Client Lib\DADTKV Client Lib.csproj", "{C5D89022-53FF-4551-AC43-66D388A0B74F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Parse_Lib", "Parse_Lib\Parse_Lib.csproj", "{876ADFAF-7720-4F1B-9F0F-E442C70C5053}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Parse_Lib", "Parse_Lib\Parse_Lib.csproj", "{876ADFAF-7720-4F1B-9F0F-E442C70C5053}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
