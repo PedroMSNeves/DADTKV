@@ -105,7 +105,7 @@ public class ClientLogic
                     int ask = 0;
                     bool com = false;
                     bool bra = false;
-
+                    bool numE = false;
                     if (newline[i] == ')') { break; } // break's out of the cycle
                     else if (newline[i] == '<')
                     {
@@ -154,6 +154,7 @@ public class ClientLogic
                                     bra = false;
                                     ask = 0;
                                     com = false;
+                                    numE = false;
                                 }
                                 else if (ask == 1 && newline[i] == '"')
                                 {
@@ -181,11 +182,16 @@ public class ClientLogic
                                             return;
                                         }  
                                     }
-                                    else if (Char.IsNumber(newline[i])) val = val * 10 + newline[i]-'0';
+                                    else if (Char.IsNumber(newline[i]) && !numE) val = val * 10 + newline[i]-'0';
                                     else
                                     {
-                                        Console.WriteLine("ERROR: Bad Write Transaction Format");
-                                        return;
+                                        if (!numE && val > -1 && (newline[i] == ' ' || newline[i] == '\t')) numE = true;
+                                        else
+                                        {
+                                            Console.WriteLine("ERROR: Bad Write Transaction Format");
+                                            return;
+                                        }
+
                                     }
                                 }
                                 else if (!(newline[i] == ' ' || newline[i] == '\t'))
