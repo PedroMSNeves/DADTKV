@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DADTKV Client Lib\DADTKV Client Lib.csproj" />
-    <ProjectReference Include="..\Parse_Bib\Parse_Lib.csproj" />
+    <ProjectReference Include="..\Parse_Lib\Parse_Lib.csproj" />
   </ItemGroup>
 
 </Project>
