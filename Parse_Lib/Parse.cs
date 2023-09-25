@@ -20,14 +20,14 @@
         {
             string newline = Console.ReadLine();
             string reduced = "";
-            if( newline == null ) { return ""; }
+            if (newline == null) { return ""; }
             int i=0;
-            bool ask=false;
-            while(i < newline.Length) 
+            bool quotes=false;
+            while (i < newline.Length) 
             {
-                if (!ask && newline[i] == '"') ask = true;
-                else if (ask && newline[i] == '"') ask = false;
-                else if (!ask && (newline[i] == ' ' || newline[i] == '\t')) { i++; continue; }
+                if (!quotes && newline[i] == '"') quotes = true;
+                else if (quotes && newline[i] == '"') quotes = false;
+                else if (!quotes && (newline[i] == ' ' || newline[i] == '\t')) { i++; continue; }
                 reduced += newline[i];
                 i++;
             }
