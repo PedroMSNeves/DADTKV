@@ -3,7 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.7.34024.191
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Client", "Client\Client.csproj", "{B2CB6CD1-AA3A-432E-8F61-5C21256648CF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Client", "Client\Client.csproj", "{B2CB6CD1-AA3A-432E-8F61-5C21256648CF}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DADTKV Client Lib", "DADTKV Client Lib\DADTKV Client Lib.csproj", "{C5D89022-53FF-4551-AC43-66D388A0B74F}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Parse_Lib", "Parse_Lib\Parse_Lib.csproj", "{876ADFAF-7720-4F1B-9F0F-E442C70C5053}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +19,14 @@ Global
 		{B2CB6CD1-AA3A-432E-8F61-5C21256648CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B2CB6CD1-AA3A-432E-8F61-5C21256648CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B2CB6CD1-AA3A-432E-8F61-5C21256648CF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C5D89022-53FF-4551-AC43-66D388A0B74F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C5D89022-53FF-4551-AC43-66D388A0B74F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C5D89022-53FF-4551-AC43-66D388A0B74F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C5D89022-53FF-4551-AC43-66D388A0B74F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{876ADFAF-7720-4F1B-9F0F-E442C70C5053}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{876ADFAF-7720-4F1B-9F0F-E442C70C5053}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{876ADFAF-7720-4F1B-9F0F-E442C70C5053}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{876ADFAF-7720-4F1B-9F0F-E442C70C5053}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
