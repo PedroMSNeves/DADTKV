@@ -1,16 +1,24 @@
 ﻿using Grpc.Core;
 using Grpc.Net.Client;
+using System.Threading.Channels;
 
 namespace DADTKV_Client_Lib
 {
     public class DADTKV_Client
     {
-        private readonly TmService.TmServiceClient tm;
+        private List<GrpcChannel> channels;
+        private TmService.TmServiceClient tm;
+        private int tm_cursor; // futuramente ira ser usado para saber o "nosso" tm, updated quando esse tm nao responder
 
         public DADTKV_Client()
         {
-            GrpcChannel channel = GrpcChannel.ForAddress("http://localhost:" + "1000");
-            tm = new TmService.TmServiceClient(channel);
+            channels = new List<GrpcChannel>();
+            tm = null;
+            tm_cursor = 0;
+        }
+        public void AddServer(string url)
+        {
+            channels.Add(GrpcChannel.ForAddress(url));
         }
         public List<DadInt> TxSubmit(string cname, List<string> read,List<DadInt> write)
         {
@@ -20,6 +28,12 @@ namespace DADTKV_Client_Lib
             request.Reads.AddRange(read);
             foreach (DadInt d in write) { request.Writes.Add(new DadIntProto { Key = d.Key , Value = d.Val }); }
 
+            if(tm == null)
+            {
+                foreach (char c in cname) tm_cursor += (int) c; //calcular o valor do nome
+                tm_cursor = tm_cursor % channels.Count(); // saber que server vai escolher
+                tm = new TmService.TmServiceClient(channels[tm_cursor]);
+            }
             try
             {
                 reply = tm.TxSubmitAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();
@@ -27,6 +41,7 @@ namespace DADTKV_Client_Lib
             catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded || ex.StatusCode == StatusCode.Unavailable)
             {
                 Console.WriteLine("Couldn't contact Server");
+                tm = new TmService.TmServiceClient(channels[++tm_cursor]); // muda o servidor que estava a contactar
                 return new List<DadInt>();
             }
             foreach ( DadIntProto dad in reply.Reads) { result.Add(new DadInt(dad.Key, dad.Value)); }
