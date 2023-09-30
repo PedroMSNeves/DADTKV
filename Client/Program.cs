@@ -15,7 +15,7 @@ namespace Client
     {
         public static void Main(string[] args)
         {
-            ClientLogic clientLogic = new ClientLogic();
+            ClientLogic clientLogic = new ClientLogic(args[1]);
 
             while (true)
             {

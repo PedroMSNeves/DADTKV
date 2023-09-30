@@ -1,17 +1,36 @@
-﻿namespace DADTKV_Client_Lib
+﻿using Grpc.Core;
+using Grpc.Net.Client;
+
+namespace DADTKV_Client_Lib
 {
     public class DADTKV_Client
     {
-        private Dictionary<string, int> store_replica;
-        //provavelmente guarda coneccao para todos os TM
+        private readonly TmService.TmServiceClient tm;
+
         public DADTKV_Client()
         {
-            store_replica = new Dictionary<string, int>();
+            GrpcChannel channel = GrpcChannel.ForAddress("http://localhost:" + "1000");
+            tm = new TmService.TmServiceClient(channel);
         }
-        public List<DadInt> TxSubmit(List<string> read,List<DadInt> write)
+        public List<DadInt> TxSubmit(string cname, List<string> read,List<DadInt> write)
         {
-            //TODO
-            return new List<DadInt>();
+            TxReply reply;
+            List<DadInt> result = new List<DadInt>();
+            TxRequest request = new TxRequest { Id = cname };
+            request.Reads.AddRange(read);
+            foreach (DadInt d in write) { request.Writes.Add(new DadIntProto { Key = d.Key , Value = d.Val }); }
+
+            try
+            {
+                reply = tm.TxSubmitAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();
+            }
+            catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded || ex.StatusCode == StatusCode.Unavailable)
+            {
+                Console.WriteLine("Couldn't contact Server");
+                return new List<DadInt>();
+            }
+            foreach ( DadIntProto dad in reply.Reads) { result.Add(new DadInt(dad.Key, dad.Value)); }
+            return result;
         }
         public bool Status()
         {
@@ -22,15 +41,14 @@
     }
     public struct DadInt
     {
-        public DadInt(string obj, int val)
+        public DadInt(string key, int val)
         {
-            Obj = obj;
+            Key = key;
             Val = val;
         }
-
-        public string Obj { get; }
+        public string Key { get; }
         public int Val { get; }
 
-        public override string ToString() => $"({Obj}, {Val})";
+        public override string ToString() => $"({Key}, {Val})";
     }
 }
