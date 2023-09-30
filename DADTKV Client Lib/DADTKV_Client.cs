@@ -41,7 +41,8 @@ namespace DADTKV_Client_Lib
             catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded || ex.StatusCode == StatusCode.Unavailable)
             {
                 Console.WriteLine("Couldn't contact Server");
-                tm = new TmService.TmServiceClient(channels[++tm_cursor]); // muda o servidor que estava a contactar
+                tm_cursor= ++tm_cursor % channels.Count();
+                tm = new TmService.TmServiceClient(channels[tm_cursor]); // muda o servidor que estava a contactar
                 return new List<DadInt>();
             }
             foreach ( DadIntProto dad in reply.Reads) { result.Add(new DadInt(dad.Key, dad.Value)); }
