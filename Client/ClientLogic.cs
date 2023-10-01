@@ -34,9 +34,8 @@ public class ClientLogic
         if (!Parse_Lib.Parse.ParseWrites(newline, ref i, out writes)) { Console.WriteLine("ERROR: Bad Write Transaction Format"); return; }
         
         List<DadInt> reply = _dadtkv.TxSubmit(this._name,reads, DictToList(writes));
-        Console.WriteLine("Reads replies:");
+        if(reply.Any()) Console.WriteLine("Reads replies:");
         foreach (DadInt rep in reply) { Console.WriteLine(rep.ToString()); }
-        return;
     }
     private List<DadInt> DictToList(Dictionary<string,int> writes)
     {

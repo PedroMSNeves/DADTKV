@@ -7,14 +7,9 @@
             int val;
             string newline = Console.ReadLine();
             if (newline == null) { return -1; }
-            if (int.TryParse(newline, out val))
-            {
-                return val;
-            }
-            else
-            {
-                return -1;
-            }
+
+            if (int.TryParse(newline, out val)) return val;
+            return -1;
         }
         public static string ParseStringNoSpaces()
         {
@@ -74,10 +69,11 @@
         {
             name = "";
             val = 0;
-            if (newline[i] != '<') { return false; }
-            i++;
+            if (newline[i] != '<') return false;
+
+            if (++i >= newline.Length) return false;
             if (!ParseString(newline,ref i, ref name)) return false;
-            if (newline[i] != ',') { return false; }
+            if (newline[i] != ',') return false;
             if (++i >= newline.Length) return false;
             if (!ParseNumber(newline, ref i, ref val)) return false;            
             return true;
@@ -90,7 +86,7 @@
                 neg = true;
                 if (++i >= newline.Length) return false;
             }
-            if (newline[i] == '>') { return false; }
+            if (newline[i] == '>') return false;
             while (i < newline.Length && newline[i] != '>') 
             {
                 if (Char.IsNumber(newline[i])) val = val * 10 + newline[i] - '0';
@@ -105,7 +101,7 @@
         }
         public static bool ParseString(string newline, ref int i, ref string name)
         {
-            if (newline[i] != '"') { return false; }
+            if (newline[i] != '"') return false;
             i++;
             while (i < newline.Length && newline[i] != '"') 
             {
@@ -116,6 +112,6 @@
             i++;
             if(i >= newline.Length) return false;
             return true;
-        }
+        } 
     }
 }
