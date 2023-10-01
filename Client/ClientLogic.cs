@@ -11,7 +11,11 @@ public class ClientLogic
         _dadtkv = new DADTKV_Client();
         _name = name;
 	}
-	public void Sleep()
+    public void AddServer(string server)
+    {
+        _dadtkv.AddServer(server);
+    }
+    public void Sleep()
 	{
 		int miliseconds = Parse_Lib.Parse.ParseInt();
 		if(miliseconds < 0 ) { Console.WriteLine("ERROR: Input valid number of miliseconds"); return; }

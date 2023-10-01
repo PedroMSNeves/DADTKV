@@ -13,9 +13,26 @@ namespace Client
 
     class Program
     {
+        private static ClientLogic args_prep(string[] args)
+        {
+            ClientLogic clientLogic;
+            if (args.Length == 0 || args.Length == 1)
+            {
+                Console.WriteLine("ERROR: Invalid number of args");
+                Console.WriteLine("Press any key to close");
+                Console.ReadKey();
+                Environment.Exit(0);
+            }
+            clientLogic = new ClientLogic(args[0]);
+
+            for (int i = 1; i < args.Length; i++) clientLogic.AddServer(args[i]);
+
+            return clientLogic;
+        }
+
         public static void Main(string[] args)
         {
-            ClientLogic clientLogic = new ClientLogic(args[1]);
+            ClientLogic clientLogic = args_prep(args);
 
             while (true)
             {
