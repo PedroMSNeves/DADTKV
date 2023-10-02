@@ -43,12 +43,14 @@ namespace DADTKV_TM
             List<string> lm_urls = new List<string>();
             getUrls(args, ref tm_urls, ref lm_urls); // gets all url servers minus his
             Uri url = new Uri(args[1]); // gets his url 
-            ServerPort serverPort = new ServerPort(url.Host, url.Port, ServerCredentials.Insecure);
+            ServerPort serverPort = new ServerPort(url.Host, url.Port, ServerCredentials.Insecure); //maybe apanha erros do url
 
-            Store st = new Store(); // para depois pudermos ter a store a ser mudada pelos varios servicos
+            Store st = new Store(args[0]); // para depois pudermos ter a store a ser mudada pelos varios servicos
             Server server = new Server
             {
-                Services = { TmService.BindService(new ServerService(st, args[0], tm_urls, lm_urls)) },
+                Services = { TmService.BindService(new ServerService(st, args[0], tm_urls, lm_urls)),
+                            BroadCastService.BindService(new BroadService(st)),
+                            LeaseService.BindService(new LService(st)) },
                 Ports = { serverPort }
             };
 

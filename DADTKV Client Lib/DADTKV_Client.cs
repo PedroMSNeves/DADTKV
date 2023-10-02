@@ -17,7 +17,7 @@ namespace DADTKV_Client_Lib
         }
         public void AddServer(string url)
         {
-            channels.Add(GrpcChannel.ForAddress(url));
+            channels.Add(GrpcChannel.ForAddress(url)); // error detection
         }
         public List<DadInt> TxSubmit(string cname, List<string> read,List<DadInt> write)
         {

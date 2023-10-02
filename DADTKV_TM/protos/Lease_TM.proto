@@ -5,15 +5,19 @@ message LeaseProto {
 	repeated string keys = 2;
 }
 message LeaseRequest {
-  string id = 1;
-  repeated string keys = 2;
+	string id = 1;
+	repeated string keys = 2;
 }
 
 message LeaseReply {
+	bool ack = 1;
+}
+message LeaseBroadCastRequest {
 	int32 epoch = 1;
 	repeated LeaseProto leases = 2;
 }
 
 service LeaseService {
-  rpc Lease (LeaseRequest) returns (LeaseReply);
+	rpc Lease (LeaseRequest) returns (LeaseReply);
+	rpc LeaseBroadCast (LeaseBroadCastRequest) returns (LeaseReply);
 }

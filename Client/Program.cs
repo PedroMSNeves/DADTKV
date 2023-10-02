@@ -50,7 +50,6 @@ namespace Client
                         break;
                     case ' ':
                         break; // it will read the next char
-                    //maybe add a comand that lists all DADINTs stored in the DADTKV lib of the client
                 }
             }
         }
