@@ -4,6 +4,9 @@ using System.Collections;
 using System.Threading.Channels;
 using Grpc.Net.Client;
 using System.Globalization;
+using System.Xml.Linq;
+using System.Collections.Generic;
+using System.ComponentModel;
 
 namespace DADKTV_LM
 {
@@ -38,6 +41,23 @@ namespace DADKTV_LM
             Request result;
             return requests.TryDequeue(out result);
         }
+        public void BroadLease(int epoch, List<Request> leases)
+        {
+            LeaseReply reply;
+            LeaseBroadCastRequest request = new LeaseBroadCastRequest { Epoch = epoch }; //cria request
+            //request.Leases.AddRange(leases);
+            foreach (Request r in leases)
+            { 
+                LeaseProto lp = new LeaseProto { Tm = r.Tm_name };
+                foreach (string k in r.Keys) { lp.Keys.Add(k); }
+                request.Leases.Add(lp);
+            }
+
+            foreach (LeaseService.LeaseServiceClient stub in tm_stubs)
+            {
+                reply = stub.LeaseBroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
+            }
+        }
     }
 
     public class ServerService : LeaseService.LeaseServiceBase
@@ -60,6 +80,11 @@ namespace DADKTV_LM
             LeaseReply reply = new LeaseReply { Ack = _data.AddRequest(
                 new Request(request.Id, request.Keys.ToList(), request.LeaseRequestId)) };
             return reply;
+        }
+
+        public void BroadcastLease(int epoch, List<Request> leases)
+        {
+            _data.BroadLease(epoch, leases);
         }
     }
 }
