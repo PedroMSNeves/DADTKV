@@ -12,6 +12,9 @@ using Grpc.Net.Client;
 
 namespace DADTKV_TM
 {
+    /// <summary>
+    /// Class lease for storing information about a certain lease
+    /// </summary>
     public class Lease
     {
         public Lease(string tm_name, int epoch)
@@ -26,7 +29,9 @@ namespace DADTKV_TM
 
         public override string ToString() => $"({Tm_name}, {Epoch}, {End})";
     }
-
+    /// <summary>
+    /// Where data is stored
+    /// </summary>
     public class Store // guarda a info
     {
         private string _name;
@@ -134,6 +139,9 @@ namespace DADTKV_TM
             return true;
         }
     }
+    /// <summary>
+    /// Receive Requests from the Clients
+    /// </summary>
     public class ServerService : TmService.TmServiceBase
     {
         Store _store;
@@ -187,28 +195,38 @@ namespace DADTKV_TM
             return true;
         }
     }
-
+    /// <summary>
+    /// Conctact with Lease Manager
+    /// </summary>
     public class LmContact
     {
+        private int _lease_id;
         private string _name;
         List<LeaseService.LeaseServiceClient> lm_stubs = new List<LeaseService.LeaseServiceClient>();
         public LmContact (string name, List<string> lm_urls)
         {
+            _lease_id = 0;
             _name = name;
             foreach (string url in lm_urls) lm_stubs.Add(new LeaseService.LeaseServiceClient(GrpcChannel.ForAddress(url)));
         }
-        public void RequestLease(List<string> keys)
+        public bool RequestLease(List<string> keys)
         {
             LeaseReply reply;
-            LeaseRequest request = new LeaseRequest { Id = _name }; //cria request
+            LeaseRequest request = new LeaseRequest { Id = _name, LeaseRequestId = _lease_id }; //cria request
             request.Keys.AddRange(keys);
 
             foreach (LeaseService.LeaseServiceClient stub in lm_stubs)
             {
                 reply = stub.LeaseAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
             }
+            incrementLeaseId();
+            return true;
         }
+        public void incrementLeaseId() { _lease_id++; }
     }
+    /// <summary>
+    /// Contact with Transaction Manager, to propagate changes
+    /// </summary>
     public class TmContact
     {
         List<BroadCastService.BroadCastServiceClient> tm_stubs = new List<BroadCastService.BroadCastServiceClient>();
@@ -233,6 +251,9 @@ namespace DADTKV_TM
             return true;
         }
     }
+    /// <summary>
+    /// Receive changes from other Transaction Managers
+    /// </summary>
     public class BroadService : BroadCastService.BroadCastServiceBase
     {
         private Store store;
@@ -250,6 +271,9 @@ namespace DADTKV_TM
             return new BroadReply { Ack = store.Write(request.Writes.ToList(),request.TmName,request.Epoch.ToList()) };
         }
     }
+    /// <summary>
+    /// Receive new leases from the Lease Managers
+    /// </summary>
     public class LService : LeaseService.LeaseServiceBase
     {
         private Store store;

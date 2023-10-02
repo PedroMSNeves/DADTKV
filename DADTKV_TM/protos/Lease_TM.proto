@@ -7,6 +7,7 @@ message LeaseProto {
 message LeaseRequest {
 	string id = 1;
 	repeated string keys = 2;
+	int32 lease_request_id =3;
 }
 
 message LeaseReply {
