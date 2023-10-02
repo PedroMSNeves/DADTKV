@@ -42,10 +42,12 @@ namespace DADKTV_LM
             Uri url = new Uri(args[1]); // gets his url 
             ServerPort serverPort = new ServerPort(url.Host, url.Port, ServerCredentials.Insecure);
 
-            //Store st = new Store(); // para depois pudermos ter a store a ser mudada pelos varios servicos
+            LeaseData dt = new LeaseData(lm_urls, tm_urls);
+
             Server server = new Server
             {
-                Services = { LeaseService.BindService(new ServerService(args[0], tm_urls, lm_urls)) },
+                Services = { LeaseService.BindService(new LeageManager(args[0], dt)) ,
+                            PaxosService.BindService(new Paxos(args[0], dt))},
                 Ports = { serverPort }
             };
 
