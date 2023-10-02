@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+message LeaseProto {
+	string tm = 1;
+	repeated string keys = 2;
+}
+message PrepareRequest {
+	int32 round_id = 1;
+}
+
+message Promise {
+	int32 write_ts = 1;
+	repeated LeaseProto leases = 2;
+}
+message AcceptRequest {
+	int32 write_ts = 1;
+	repeated LeaseProto leases = 2;
+}
+
+message AcceptReply {
+	bool ack = 1;
+}
+
+service PaxosService {
+	rpc Prepare (PrepareRequest) returns (Promise);
+	rpc Accept (AcceptRequest) returns (AcceptReply);
+}
