@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-message LeaseProto {
+message LeasePaxos {
 	string tm = 1;
 	repeated string keys = 2;
 }
@@ -10,11 +10,12 @@ message PrepareRequest {
 
 message Promise {
 	int32 write_ts = 1;
-	repeated LeaseProto leases = 2;
+	repeated LeasePaxos leases = 2;
+	bool ack = 3; //if its false its not a promise
 }
 message AcceptRequest {
 	int32 write_ts = 1;
-	repeated LeaseProto leases = 2;
+	repeated LeasePaxos leases = 2;
 }
 
 message AcceptReply {
