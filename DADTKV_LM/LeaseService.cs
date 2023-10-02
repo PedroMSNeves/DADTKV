@@ -113,6 +113,7 @@ namespace DADKTV_LM
         }
     }
 
+
     public class Paxos : PaxosService.PaxosServiceBase
     {
         private string _name;
@@ -126,16 +127,18 @@ namespace DADKTV_LM
 
         public int PrepareRequest()
         {
-            PrepareRequest request = new PrepareRequest { RoundId = _data.IncrementWriteTS() }; //rever afinal não é bem assim
+            PrepareRequest request = new PrepareRequest { RoundId = _data.IncrementWriteTS() }; //rever afinal não é bem assim quando um server falha
             Promise reply;
             int promises = 0;
             foreach (PaxosService.PaxosServiceClient stub in _data.lm_stubs)
             {
                 reply = stub.PrepareAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
                 if (reply.Ack) promises++;
+                //guardar o reply com maior timestamp
             }
             return promises; //mudar para bool, true se for maioria
         }
+        //a função que chama o prepareRequest se devolver true vai chamar o AcceptRrequest (Líder)
         public override Task<Promise> Prepare(PrepareRequest request, ServerCallContext context) // return task
         {
             return Task.FromResult(Prep(request));
@@ -145,7 +148,7 @@ namespace DADKTV_LM
             //dar lock
             
             Promise reply;
-            if (request.RoundId < _data.GetReadTS())
+            if (request.RoundId <= _data.GetReadTS())
             {
                 reply = new Promise { Ack = false };
                 return reply;
@@ -159,6 +162,43 @@ namespace DADKTV_LM
                 foreach (string k in r.Keys) { lp.Keys.Add(k); }
                 reply.Leases.Add(lp);
             }
+            return reply;
+        }
+
+
+        public void AcceptRequest()
+        {
+            AcceptReply reply;
+            AcceptRequest request = new AcceptRequest { WriteTs = _data.GetWriteTS() };//aqui o WriteTs é o mesmo que o round? ou é -1 que o round?
+            foreach (Request r in _data.GetMyValue()) //aqui estaria a mandar o valor com o timstamp mas alto dos que recebeu
+            {
+                LeasePaxos lp = new LeasePaxos { Tm = r.Tm_name };
+                foreach (string k in r.Keys) { lp.Keys.Add(k); }
+                request.Leases.Add(lp);
+            }
+            foreach (PaxosService.PaxosServiceClient stub in _data.lm_stubs) //não quero fazer isto aqui
+            {
+                reply = stub.AcceptAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
+                //if (reply.Ack) promises++;
+            }
+            //return promises;
+
+        }
+        public override Task<AcceptReply> Accept(AcceptRequest request, ServerCallContext context)
+        {
+            return Task.FromResult(Accpt(request));
+        }
+        public AcceptReply Accpt(AcceptRequest request) //quandp recebe Accept e aceita, manda Accepted para todos os outros learners
+        {
+            AcceptReply reply = new AcceptReply();
+            if (request.WriteTs < _data.GetReadTS()) //acho que é o read_ts mas confirmar
+            {
+                reply.Ack = false;
+                return reply;
+            }
+            reply.Ack = true;
+            //só aplica o valor recebido depois de receber uma maioria de accepted dos outros, falta essa msg no proto
+            //devia guardar o valor a aplicar?
             return reply;
         }
     }
