@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-package pt.ulisboa.tecnico.DADTKV.LeaseService;
-
 message LeaseProto {
 	string tm = 1;
 	repeated string keys = 2;
