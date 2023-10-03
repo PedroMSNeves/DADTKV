@@ -18,12 +18,14 @@ namespace DADKTV_LM
         {
             Tm_name = tm_name;
             Keys = keys;
-            //LeaseID = leaseId;
+            LeaseID = leaseId;
         }
         public string Tm_name { get; }
         public List<string> Keys { get; }
-        //public int LeaseID { get; }
+        public int LeaseID { get; }
     }
+
+
     public class LeaseData
     {
         public List<LeaseService.LeaseServiceClient> tm_stubs = new List<LeaseService.LeaseServiceClient>(); //nao quero isto publico mas por agr fica assim
@@ -34,7 +36,18 @@ namespace DADKTV_LM
         {
             foreach (string url in tm_urls) tm_stubs.Add(new LeaseService.LeaseServiceClient(GrpcChannel.ForAddress(url)));
             foreach (string url in lm_urls) lm_stubs.Add(new PaxosService.PaxosServiceClient(GrpcChannel.ForAddress(url)));
+            RoundID = 0;
+            Read_TS = 0;
+            Write_TS = 0;
         }
+
+        public int RoundID { set; get; }
+        public int IncrementRoundID()
+        {
+            return ++RoundID;
+        }
+        public int Read_TS { get; set; }
+        public int Write_TS { get; set; }
 
         public void AddRequest(Request request) //adds in the end
         {
@@ -137,20 +150,12 @@ namespace DADKTV_LM
         public Paxos(string name, LeaseData data)
         {
             Name = name;
-            Write_TS = 0;
-            Read_TS = 0;
             _data = data;
             //When paxos is called needs to select the requests that don´t conflict to define our value
             My_value = _data.GetMyValue();
         }
         public string Name { get; }
-        public int Write_TS { set; get; }
-        public int IncrementWriteTS()
-        {
-            return ++Write_TS;
-        }
         public List<Request> My_value { set; get; }
-        public int Read_TS { get; set; }
 
         
         public override Task<Promise> Prepare(PrepareRequest request, ServerCallContext context)
@@ -162,17 +167,17 @@ namespace DADKTV_LM
             //dar lock
             
             Promise reply;
-            if (request.RoundId <= Read_TS)
+            if (request.RoundId <= _data.Read_TS)
             {
                 reply = new Promise { Ack = false };
                 return reply;
             }
 
-            Read_TS = request.RoundId;
-            reply = new Promise { WriteTs = Write_TS, Ack = true };
+            _data.Read_TS = request.RoundId;
+            reply = new Promise { WriteTs = _data.Write_TS, Ack = true };
             foreach (Request r in My_value)
             {
-                LeasePaxos lp = new LeasePaxos { Tm = r.Tm_name };
+                LeasePaxos lp = new LeasePaxos { Tm = r.Tm_name, LeaseRequestId = r.LeaseID };
                 foreach (string k in r.Keys) { lp.Keys.Add(k); }
                 reply.Leases.Add(lp);
             }
@@ -186,7 +191,7 @@ namespace DADKTV_LM
         public AcceptReply Accpt(AcceptRequest request) //quandp recebe Accept e aceita, manda Accepted para todos os outros learners
         {
             AcceptReply reply = new AcceptReply();
-            if (request.WriteTs < Read_TS)
+            if (request.WriteTs < _data.Read_TS)
             {
                 reply.Ack = false;
                 return reply;
@@ -205,44 +210,37 @@ namespace DADKTV_LM
         public PaxosLeader(string name, LeaseData data)
         {
             Name = name;
-            RoundID = 0;
-            ReadTS = 0;
-            Write_TS = 0;
             Others_value = new List<Request>();
+            Other_TS = 0;
             _data = data;
             My_value = _data.GetMyValue();
 
             if (PrepareRequest()) AcceptRequest();
         }
         public string Name { get; }
-        public int RoundID { set; get; }
-        public int IncrementRoundID()
-        {
-            return ++RoundID;
-        }
         public List<Request> My_value { set; get; }
         public List<Request> Others_value { set; get; }
-        public int ReadTS { get; set; }
-        public int Write_TS { get; set; }
+        public int Other_TS { get; set; }
 
         public bool PrepareRequest()
         {
-            PrepareRequest request = new PrepareRequest { RoundId = IncrementRoundID() };
+            PrepareRequest request = new PrepareRequest { RoundId = _data.IncrementRoundID() };
             Promise reply;
             int promises = 0;
             foreach (PaxosService.PaxosServiceClient stub in _data.lm_stubs)
             {
                 reply = stub.PrepareAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
                 if (reply.Ack) promises++;
-                if (reply.WriteTs > Write_TS)
+
+                Other_TS = _data.Write_TS;
+                if (reply.WriteTs > Other_TS)
                 {
-                    //Others_value = reply.Leases.ToList();
-                    //LeasePaxos lp = new LeasePaxos { Tm = r.Tm_name };
-                    //foreach (string k in r.Keys) { lp.Keys.Add(k); }
-                    //request.Leases.Add(lp);
+                    foreach (LeasePaxos l in reply.Leases)
+                    {
+                        Others_value.Add(new Request(l.Tm, l.Keys.ToList(), l.LeaseRequestId));
+                    }
+                    Other_TS = reply.WriteTs;
                 }
-                //guardar o reply com maior timestamp
-                //guardar TS e valor
             }
             return promises > (_data.lm_stubs.Count + 1) / 2; //true se for maioria, removemos da lista se morrerem?
         }
@@ -250,15 +248,28 @@ namespace DADKTV_LM
         public void AcceptRequest()
         {
             AcceptReply reply;
-            AcceptRequest request = new AcceptRequest { WriteTs = Write_TS };//aqui o WriteTs é o mesmo que o round? ou é -1 que o round?
+            AcceptRequest request = new AcceptRequest { WriteTs = _data.RoundID};
+            LeasePaxos lp;
             //comparar os TS e ver qual vamos aceitar
-            foreach (Request r in My_value) //aqui estaria a mandar o valor com o timstamp mas alto dos que recebeu
+            if (Other_TS > _data.Write_TS)
             {
-                LeasePaxos lp = new LeasePaxos { Tm = r.Tm_name };
-                foreach (string k in r.Keys) { lp.Keys.Add(k); }
-                request.Leases.Add(lp);
+                foreach (Request r in Others_value)
+                {
+                    lp = new LeasePaxos { Tm = r.Tm_name, LeaseRequestId = r.LeaseID };
+                    foreach (string k in r.Keys) { lp.Keys.Add(k); }
+                    request.Leases.Add(lp);
+                }
             }
-            foreach (PaxosService.PaxosServiceClient stub in _data.lm_stubs) //não quero fazer isto aqui
+            else
+            {
+                foreach (Request r in My_value)
+                {
+                    lp = new LeasePaxos { Tm = r.Tm_name, LeaseRequestId = r.LeaseID };
+                    foreach (string k in r.Keys) { lp.Keys.Add(k); }
+                    request.Leases.Add(lp);
+                }
+            }
+            foreach (PaxosService.PaxosServiceClient stub in _data.lm_stubs)
             {
                 reply = stub.AcceptAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
                 //if (reply.Ack) promises++;
