@@ -90,11 +90,11 @@ namespace DADTKV_TM
             
             return 0;
         }
-        public bool Write(List<DadIntTmProto> writes, string tm_name, List<int> epoch)
+        public bool Write(List<DadIntProto> writes, string tm_name, List<int> epoch)
         {
             lock (this)
             {
-                foreach (DadIntTmProto write in writes) { _store[write.Key] = write.Value; }
+                foreach (DadIntProto write in writes) { _store[write.Key] = write.Value; }
                 if(tm_name != null) LeaseRemove(tm_name, epoch);
             }
             return true; // possivelmente tratamento de erros depois
@@ -238,8 +238,8 @@ namespace DADTKV_TM
         {
             BroadReply reply;
             BroadRequest request = new BroadRequest { TmName = name }; //cria request
-            List<DadIntTmProto> writesTm = new List<DadIntTmProto>();
-            foreach(DadIntProto tm in writes) writesTm.Add(new DadIntTmProto { Key = tm.Key , Value = tm.Value });
+            List<DadIntProto> writesTm = new List<DadIntProto>();
+            foreach(DadIntProto tm in writes) writesTm.Add(new DadIntProto { Key = tm.Key , Value = tm.Value });
             request.Epoch.AddRange(epoch);
             request.Writes.AddRange(writesTm);
 
