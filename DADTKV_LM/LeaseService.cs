@@ -27,36 +27,13 @@ namespace DADKTV_LM
         public List<LeaseService.LeaseServiceClient> tm_stubs = new List<LeaseService.LeaseServiceClient>(); //nao quero isto publico mas por agr fica assim
         public List<PaxosService.PaxosServiceClient> lm_stubs = new List<PaxosService.PaxosServiceClient>();
         Queue<Request> _requests = new Queue<Request>(); //requests received from TMs //change this to List
-        int _writeTS = 0;
-        int _readTS = 0;
-        List<Request> _my_value = new List<Request>();
 
         public LeaseData(List<string> lm_urls, List<string> tm_urls) 
         {
             foreach (string url in tm_urls) tm_stubs.Add(new LeaseService.LeaseServiceClient(GrpcChannel.ForAddress(url)));
             foreach (string url in lm_urls) lm_stubs.Add(new PaxosService.PaxosServiceClient(GrpcChannel.ForAddress(url)));
         }
-        public int GetWriteTS() 
-        {
-            return _writeTS;
-        }
-        public int GetReadTS()
-        {
-            return _readTS;
-        }
-        public int IncrementWriteTS() 
-        {
-            return ++_writeTS;
-        }
-        public int SetReadTS(int n)
-        {
-            _readTS = n;
-            return _readTS;
-        }
-        public List<Request> GetMyValue()
-        {
-            return _my_value;
-        }
+
         public bool AddRequest(Request request)
         {
             _requests.Enqueue(request);
@@ -116,18 +93,29 @@ namespace DADKTV_LM
 
     public class Paxos : PaxosService.PaxosServiceBase
     {
-        private string _name;
         private LeaseData _data;
+
         public Paxos(string name, LeaseData data)
         {
-            _name = name;
+            Name = name;
+            WriteTS = 0;
+            ReadTS = 0;
+            My_value = new List<Request>();
             _data = data;
             //When paxos is called needs to select the requests that don´t conflict to define our value
         }
+        public string Name { get; }
+        public int WriteTS { set; get; }
+        public int IncrementWriteTS()
+        {
+            return ++WriteTS;
+        }
+        public List<Request> My_value { set; get; }
+        public int ReadTS { get; set; }
 
         public int PrepareRequest()
         {
-            PrepareRequest request = new PrepareRequest { RoundId = _data.IncrementWriteTS() }; //rever afinal não é bem assim quando um server falha
+            PrepareRequest request = new PrepareRequest { RoundId = IncrementWriteTS() }; //rever afinal não é bem assim quando um server falha
             Promise reply;
             int promises = 0;
             foreach (PaxosService.PaxosServiceClient stub in _data.lm_stubs)
@@ -148,15 +136,15 @@ namespace DADKTV_LM
             //dar lock
             
             Promise reply;
-            if (request.RoundId <= _data.GetReadTS())
+            if (request.RoundId <= ReadTS)
             {
                 reply = new Promise { Ack = false };
                 return reply;
             }
 
-            _data.SetReadTS(request.RoundId);
-            reply = new Promise { WriteTs = _data.GetWriteTS(), Ack = true };
-            foreach (Request r in _data.GetMyValue())
+            ReadTS = request.RoundId;
+            reply = new Promise { WriteTs = WriteTS, Ack = true };
+            foreach (Request r in My_value)
             {
                 LeasePaxos lp = new LeasePaxos { Tm = r.Tm_name };
                 foreach (string k in r.Keys) { lp.Keys.Add(k); }
@@ -169,8 +157,8 @@ namespace DADKTV_LM
         public void AcceptRequest()
         {
             AcceptReply reply;
-            AcceptRequest request = new AcceptRequest { WriteTs = _data.GetWriteTS() };//aqui o WriteTs é o mesmo que o round? ou é -1 que o round?
-            foreach (Request r in _data.GetMyValue()) //aqui estaria a mandar o valor com o timstamp mas alto dos que recebeu
+            AcceptRequest request = new AcceptRequest { WriteTs = WriteTS };//aqui o WriteTs é o mesmo que o round? ou é -1 que o round?
+            foreach (Request r in My_value) //aqui estaria a mandar o valor com o timstamp mas alto dos que recebeu
             {
                 LeasePaxos lp = new LeasePaxos { Tm = r.Tm_name };
                 foreach (string k in r.Keys) { lp.Keys.Add(k); }
@@ -191,7 +179,7 @@ namespace DADKTV_LM
         public AcceptReply Accpt(AcceptRequest request) //quandp recebe Accept e aceita, manda Accepted para todos os outros learners
         {
             AcceptReply reply = new AcceptReply();
-            if (request.WriteTs < _data.GetReadTS()) //acho que é o read_ts mas confirmar
+            if (request.WriteTs < ReadTS) //acho que é o read_ts mas confirmar
             {
                 reply.Ack = false;
                 return reply;
