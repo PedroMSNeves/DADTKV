@@ -60,7 +60,6 @@ namespace ConfigParser
 
         public static void launchLeaseManager(string id, int paxos_id, string url, List<string> transactionManagers, List<string> leaseManagers)
         {
-            // recieves input like "Lm1 myurl id otherlmurl1 otherlmurl2 TM tmurl1 tmurl2" (name,hisurl,otherurl...,TM(delimiter),tmurl...)
             string args = $"{paxos_id}";
             // Pass all Lease Manager URLs to the Lease Manager
             foreach (string leaseManager in leaseManagers)
