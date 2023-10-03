@@ -18,6 +18,8 @@
 	<Protobuf Include="protos\Client_TS.proto" GrpcServices="Server" />
     <Protobuf Include="protos\TM_TM.proto" GrpcServices="Server,Client" />
 	<Protobuf Include="protos\Lease_TM.proto" GrpcServices="Server,Client" />
+
+
   </ItemGroup>
 
 </Project>

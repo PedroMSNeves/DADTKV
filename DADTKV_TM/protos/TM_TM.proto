@@ -1,10 +1,11 @@
 syntax = "proto3";
 
-package pt.ulisboa.tecnico.DADTKV.BroadCastService;
-import public "protos/Structures.proto";
-
+message DadIntTmProto {
+	string key = 1;
+	int32 value = 2;
+}
 message BroadRequest {
-	repeated DadIntProto writes = 1;
+	repeated DadIntTmProto writes = 1;
 	string tm_name = 2;
 	repeated int32 epoch = 3;
 }
