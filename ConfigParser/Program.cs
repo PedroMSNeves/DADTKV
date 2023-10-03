@@ -4,13 +4,25 @@ namespace ConfigParser
 {
     class Program
     {
-        public static void launchClient(string id, string clientScript)
+        public static Process createProcess(string project, string arguments)
         {
-            Process client = new Process();
-            client.StartInfo.FileName = "dotnet";
-            client.StartInfo.Arguments = $"run --project Client {id}"; // TODO pass all TMs
-            client.StartInfo.UseShellExecute = false;
-            client.StartInfo.RedirectStandardInput = true;
+            Process process = new Process();
+            process.StartInfo.FileName = "dotnet";
+            process.StartInfo.Arguments = $"run --project {project} {arguments}";
+            process.StartInfo.UseShellExecute = false;
+            process.StartInfo.RedirectStandardInput = true;
+            return process;
+        }
+        public static void launchClient(string id, string clientScript, List<string> transactionManagers)
+        {
+            // Pass all Transaction Manager URLs to the client
+            string args = $"{id}";
+            foreach (string transactionManager in transactionManagers)
+            {
+                args += $" {transactionManager}";
+            }
+
+            Process client = createProcess("Client", args);
 
             Console.WriteLine($"Launching client {id} with script {clientScript}");
             client.Start();
@@ -19,37 +31,65 @@ namespace ConfigParser
             client.StandardInput.Write(input);
         }
 
-        public static void launchTransactionManager(string id, string url)
+        public static void launchServer(string id, string url, string args)
         {
-            Process tm = new Process();
-            tm.StartInfo.FileName = "dotnet";
-            tm.StartInfo.Arguments = $"run --project DADTKV_TM {id} {url}";
-            tm.StartInfo.UseShellExecute = false;
-
-            Console.WriteLine($"Launching Transaction Manager {id} with url {url}");
-            tm.Start();
+            Process server = createProcess("Server", $"{id} {url} {args}");
+            server.Start();
         }
 
-        public static void launchLeaseManager(string id, string url)
+        public static void launchTransactionManager(string id, string url, List<string> transactionManagers, List<string> leaseManagers)
         {
-            Process lm = new Process();
-            lm.StartInfo.FileName = "dotnet";
-            lm.StartInfo.Arguments = $"run --project DADTKV_LM {id} {url}";
-            lm.StartInfo.UseShellExecute = false;
+            string args = "";
+            // Pass all Transaction Manager URLs to the Transaction Manager
+            foreach (string transactionManager in transactionManagers)
+            {
+                args += $" {transactionManager}";
+            }
+
+            args += " LM";
+
+            // Pass all Lease Manager URLs to the Transaction Manager
+            foreach (string leaseManager in leaseManagers)
+            {
+                args += $" {leaseManager}";
+            }
+
+            Console.WriteLine($"Launching Transaction Manager {id} with url {url}");
+            launchServer(id, url, args);
+        }
+
+        public static void launchLeaseManager(string id, int paxos_id, string url, List<string> transactionManagers, List<string> leaseManagers)
+        {
+            // recieves input like "Lm1 myurl id otherlmurl1 otherlmurl2 TM tmurl1 tmurl2" (name,hisurl,otherurl...,TM(delimiter),tmurl...)
+            string args = $"{paxos_id}";
+            // Pass all Lease Manager URLs to the Lease Manager
+            foreach (string leaseManager in leaseManagers)
+            {
+                args += $" {leaseManager}";
+            }
+
+            args += " TM";
+
+            // Pass all Transaction Manager URLs to the Lease Manager
+            foreach (string transactionManager in transactionManagers)
+            {
+                args += $" {transactionManager}";
+            }
 
             Console.WriteLine($"Launching Lease Manager {id} with url {url}");
-            lm.Start();
+            launchServer(id, url, args);
         }
         public static void Main(string[] args)
         {
-            // Read configuration file as argument
-            string input = File.ReadAllText(args[0]);
+            // Save server IDs and URLs to pass onto the clients
+            Dictionary<string, string> transactionManagers = new Dictionary<string, string>();
+            Dictionary<string, string> leaseManagers = new Dictionary<string, string>();
 
-            // Split configuration file into lines
-            string[] lines = input.Split('\n');
+            // Save client IDs and scripts to launch them
+            Dictionary<string, string> clients = new Dictionary<string, string>();
 
-            // Parse each line
-            foreach (string line in lines)
+            string line;
+            while ((line = Console.ReadLine()) != null)
             {
                 string[] words = line.Split(' ');
 
@@ -68,21 +108,21 @@ namespace ConfigParser
                     if (words[2] == "T")
                     {
                         string url = words[3];
-                        launchTransactionManager(id, url);
+                        transactionManagers.Add(id, url);
                     }
 
                     // Lease Manager
                     else if (words[2] == "L")
                     {
                         string url = words[3];
-                        launchLeaseManager(id, url);
+                        leaseManagers.Add(id, url);
                     }
 
                     // Client
                     else if (words[2] == "C")
                     {
                         string clientScript = words[3];
-                        launchClient(id, clientScript);
+                        clients.Add(id, clientScript);
                     }
                 }
 
@@ -110,6 +150,24 @@ namespace ConfigParser
                     int timeSlot = Int32.Parse(words[1]);
                     // TODO
                 }
+            }
+
+            // Launch all servers
+            foreach (KeyValuePair<string, string> transactionManager in transactionManagers)
+            {
+                launchTransactionManager(transactionManager.Key, transactionManager.Value, transactionManagers.Values.ToList(), leaseManagers.Values.ToList());
+            }
+
+            int paxos_id = 0;
+            foreach (KeyValuePair<string, string> leaseManager in leaseManagers)
+            {
+                launchLeaseManager(leaseManager.Key, paxos_id++, leaseManager.Value, transactionManagers.Values.ToList(), leaseManagers.Values.ToList());
+            }
+
+            // Launch all clients
+            foreach (KeyValuePair<string, string> client in clients)
+            {
+                launchClient(client.Key, client.Value, transactionManagers.Values.ToList());
             }
         }
     }
