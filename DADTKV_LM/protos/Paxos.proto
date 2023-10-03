@@ -7,6 +7,7 @@ message LeasePaxos {
 }
 message PrepareRequest {
 	int32 round_id = 1;
+	int32 leader_id = 2;
 }
 
 message Promise {
@@ -17,13 +18,18 @@ message Promise {
 message AcceptRequest {
 	int32 write_ts = 1;
 	repeated LeasePaxos leases = 2;
+	int32 leader_id = 3;
 }
 
 message AcceptReply {
 	bool ack = 1;
 }
+message AckRequest {
+}
 
 service PaxosService {
 	rpc Prepare (PrepareRequest) returns (Promise);
 	rpc Accept (AcceptRequest) returns (AcceptReply);
+	rpc Accepted (AcceptRequest) returns (AcceptReply);
+	rpc GetLeaderAck (AckRequest) returns (AcceptReply);
 }

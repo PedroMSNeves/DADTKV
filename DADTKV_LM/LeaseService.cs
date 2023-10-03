@@ -19,6 +19,7 @@ namespace DADKTV_LM
             Tm_name = tm_name;
             Keys = keys;
             LeaseID = leaseId;
+
         }
         public string Tm_name { get; }
         public List<string> Keys { get; }
@@ -27,18 +28,20 @@ namespace DADKTV_LM
 
 
     public class LeaseData
-    {
+    {   /* se um lm morrer podemos ter bitmap dos lm vivos */
         public List<LeaseService.LeaseServiceClient> tm_stubs = new List<LeaseService.LeaseServiceClient>(); //nao quero isto publico mas por agr fica assim
         public List<PaxosService.PaxosServiceClient> lm_stubs = new List<PaxosService.PaxosServiceClient>();
         List<Request> _requests = new List<Request>(); //requests received from TMs
 
-        public LeaseData(List<string> lm_urls, List<string> tm_urls) 
+        public LeaseData(List<string> lm_urls, List<string> tm_urls, bool leader) 
         {
             foreach (string url in tm_urls) tm_stubs.Add(new LeaseService.LeaseServiceClient(GrpcChannel.ForAddress(url)));
             foreach (string url in lm_urls) lm_stubs.Add(new PaxosService.PaxosServiceClient(GrpcChannel.ForAddress(url)));
             RoundID = 0;
             Read_TS = 0;
             Write_TS = 0;
+            Possible_Leader = 0;
+            IsLeader = leader;
         }
 
         public int RoundID { set; get; }
@@ -48,7 +51,8 @@ namespace DADKTV_LM
         }
         public int Read_TS { get; set; }
         public int Write_TS { get; set; }
-
+        public int Possible_Leader { get; set; }
+        public bool IsLeader { get; set; } 
         public void AddRequest(Request request) //adds in the end
         {
             lock (this)
@@ -56,14 +60,14 @@ namespace DADKTV_LM
                 _requests.Add(request);
             }
         }
-        public void AddRequestBeginning(Request request)
+        public void AddRequestBeginning(Request request) //nao ness
         {
             lock (this)
             {
                 _requests.Insert(0, request);
             }
         }
-        public bool RemoveRequest() //removes from beginning
+        public bool RemoveRequest() //removes from beginning //nao ness
         {
             lock (this)
             {
@@ -82,16 +86,13 @@ namespace DADKTV_LM
             {
                 List<string> keys = new List<string>();
                 List<Request> myValue = new List<Request>();
-                if (_requests.Count == 0) return myValue;
-                while (true) {
-                    if (Intersect(keys, _requests[0].Keys))
-                    {
-                        break;
-                    }
-                    myValue.Add(_requests[0]);
-                    keys.AddRange(_requests[0].Keys);
-                    RemoveRequest();
+                foreach(Request request in _requests)
+                {
+                    if (Intersect(keys, request.Keys)) continue;
+                    myValue.Add(request);
+                    keys.AddRange(request.Keys);
                 }
+                    
                 return myValue;
             }
         }
@@ -112,6 +113,37 @@ namespace DADKTV_LM
                 reply = stub.LeaseBroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
             }
         }
+        public bool BroadAccepted(AcceptRequest request)
+        {
+            List<int> values = new List<int>(); 
+            values.Add(0);//ack counter
+            values.Add(0);//nack counter
+            foreach (PaxosService.PaxosServiceClient stub in lm_stubs)
+            {
+                Thread t = new Thread(() => { sendAccepted(ref values, stub, request); });
+                t.Start();
+            }
+            lock (values)
+            {
+                while (!(values[0] + 1 >= (lm_stubs.Count + 1) / 2 || values[1] >= (lm_stubs.Count + 1) / 2)) Monitor.Wait(this);
+                if (values[0] + 1 >= (lm_stubs.Count + 1) / 2) return true;
+                else return false;
+            }
+        }
+        private void sendAccepted(ref List<int> values, PaxosService.PaxosServiceClient stub, AcceptRequest request)
+        {
+            AcceptReply reply = stub.AcceptedAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();
+            lock (values)
+            {
+                if (reply.Ack) values[0]++;
+                else values[1]++;
+                Monitor.Pulse(this);
+            }
+        }
+        public bool getLeaderAck()
+        {
+            return lm_stubs[Possible_Leader].GetLeaderAckAsync(new AckRequest(),new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult().Ack;
+        }
     }
 
     public class LeageManager : LeaseService.LeaseServiceBase
@@ -130,8 +162,6 @@ namespace DADKTV_LM
         }
         public LeaseReply Ls(LeaseRequest request)
         {
-            //dar lock
-
             _data.AddRequest(new Request(request.Id, request.Keys.ToList(), request.LeaseRequestId));
             return new LeaseReply { Ack = true };
         }
@@ -164,22 +194,28 @@ namespace DADKTV_LM
         }
         public Promise Prep(PrepareRequest request) //returns promise if roundId >  my readTS
         {
-            //dar lock
-            
             Promise reply;
-            if (request.RoundId <= _data.Read_TS)
-            {
-                reply = new Promise { Ack = false };
-                return reply;
-            }
 
-            _data.Read_TS = request.RoundId;
-            reply = new Promise { WriteTs = _data.Write_TS, Ack = true };
-            foreach (Request r in My_value)
+            lock (_data)
             {
-                LeasePaxos lp = new LeasePaxos { Tm = r.Tm_name, LeaseRequestId = r.LeaseID };
-                foreach (string k in r.Keys) { lp.Keys.Add(k); }
-                reply.Leases.Add(lp);
+                if (_data.IsLeader && request.RoundId > _data.RoundID)
+                {
+                    _data.IsLeader = false;
+                }
+                if (request.RoundId <= _data.Read_TS)
+                {
+                    reply = new Promise { Ack = false };
+                    return reply;
+                }
+                _data.Read_TS = request.RoundId;
+                _data.Possible_Leader = request.LeaderId;
+                reply = new Promise { WriteTs = _data.Write_TS, Ack = true };
+                foreach (Request r in My_value)
+                {
+                    LeasePaxos lp = new LeasePaxos { Tm = r.Tm_name, LeaseRequestId = r.LeaseID };
+                    foreach (string k in r.Keys) { lp.Keys.Add(k); }
+                    reply.Leases.Add(lp);
+                }
             }
             return reply;
         }
@@ -191,14 +227,52 @@ namespace DADKTV_LM
         public AcceptReply Accpt(AcceptRequest request) //quandp recebe Accept e aceita, manda Accepted para todos os outros learners
         {
             AcceptReply reply = new AcceptReply();
-            if (request.WriteTs < _data.Read_TS)
+            if (request.WriteTs < _data.Read_TS) // precisa de lock
+            {
+                reply.Ack = false;
+                return reply;
+            }
+
+            //broadcast accept
+            bool result = _data.BroadAccepted(request);
+            //só aplica o valor recebido depois de receber uma maioria de accepted dos outros, falta essa msg no proto
+            lock (this)
+            {
+                if (_data.IsLeader && request.WriteTs > _data.RoundID)
+                {
+                    _data.IsLeader = false;
+                }
+                if (!result) reply.Ack = false;
+                else
+                { 
+                    if (request.WriteTs == _data.Read_TS) // se isto nao acontecer e porque deu promise entretanto
+                    {
+                        reply.Ack = true;
+                        foreach (LeasePaxos l in request.Leases)
+                        {
+                            My_value.Add(new Request(l.Tm, l.Keys.ToList(), l.LeaseRequestId));
+                        }
+                        _data.Possible_Leader = request.LeaderId;
+                    }
+                    else reply.Ack = false;
+                }
+                
+            }
+            return reply;
+        }
+        public override Task<AcceptReply> Accepted(AcceptRequest request, ServerCallContext context)
+        {
+            return Task.FromResult(Accpted(request));
+        }
+        public AcceptReply Accpted(AcceptRequest request) //quandp recebe Accept e aceita, manda Accepted para todos os outros learners
+        {
+            AcceptReply reply = new AcceptReply();
+            if (request.WriteTs != _data.Read_TS)
             {
                 reply.Ack = false;
                 return reply;
             }
             reply.Ack = true;
-            //só aplica o valor recebido depois de receber uma maioria de accepted dos outros, falta essa msg no proto
-            //devia guardar o valor a aplicar?
             return reply;
         }
     }
@@ -207,12 +281,14 @@ namespace DADKTV_LM
     {
         private LeaseData _data;
 
-        public PaxosLeader(string name, LeaseData data)
+        public PaxosLeader(string name, LeaseData data, int id)
         {
             Name = name;
             Others_value = new List<Request>();
             Other_TS = 0;
             _data = data;
+            Id = id;
+            Epoch = 0;
             My_value = _data.GetMyValue();
 
             if (PrepareRequest()) AcceptRequest();
@@ -221,7 +297,49 @@ namespace DADKTV_LM
         public List<Request> My_value { set; get; }
         public List<Request> Others_value { set; get; }
         public int Other_TS { get; set; }
+        public int Id { get; set; }
+        public int Epoch { get; set; }
 
+        public void cycle()
+        {
+            bool ack = true;
+            int possible_leader = -1;
+            while (true)
+            {
+               
+                while (Id != possible_leader + 1 && ack)
+                {
+                    Thread.Sleep(5000); //dorme 5 sec e depois manda mensagem
+                    lock (_data)
+                    {
+                        possible_leader = _data.Possible_Leader;
+                        if (Id == possible_leader + 1) // depois ver tambem se é o seguinte no bitmap que esteja vivo
+                        {
+                            ack = _data.getLeaderAck();
+                        }
+                    }
+                }
+                lock (this)
+                {
+                    while (_data.IsLeader)
+                    {
+                        Epoch = Epoch + 1; //implementar tempo
+                        while (!PrepareRequest())
+                        {
+                                _data.RoundID = Other_TS + 1;//evitamos fazer muitas vezes inuteis
+                        }
+                        if (AcceptRequest())
+                        {
+                                _data.Write_TS = _data.RoundID;//evitamos fazer muitas vezes inuteis
+                                                               //eliminar os requests
+                                _data.BroadLease(Id, _data.GetMyValue());
+                        }
+                        //x em x tempo faz
+                    }
+                }
+                possible_leader = Id;
+            }
+        }
         public bool PrepareRequest()
         {
             PrepareRequest request = new PrepareRequest { RoundId = _data.IncrementRoundID() };
@@ -245,7 +363,7 @@ namespace DADKTV_LM
             return promises > (_data.lm_stubs.Count + 1) / 2; //true se for maioria, removemos da lista se morrerem?
         }
 
-        public void AcceptRequest()
+        public bool AcceptRequest()
         {
             AcceptReply reply;
             AcceptRequest request = new AcceptRequest { WriteTs = _data.RoundID};
@@ -269,12 +387,13 @@ namespace DADKTV_LM
                     request.Leases.Add(lp);
                 }
             }
+            request.LeaderId = Id;
             foreach (PaxosService.PaxosServiceClient stub in _data.lm_stubs)
             {
                 reply = stub.AcceptAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
                 //if (reply.Ack) promises++;
             }
-            //return promises;
+            return true;
         }
     }
 }
