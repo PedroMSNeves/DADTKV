@@ -251,7 +251,6 @@ namespace DADKTV_LM
             _tmContact = new TmContact(tm_urls);
             _lmcontact = new LmContact(name, lm_urls);
 
-            if (PrepareRequest()) AcceptRequest();
         }
         public string Name { get; }
         public List<Request> My_value { set; get; }
@@ -329,6 +328,7 @@ namespace DADKTV_LM
             AcceptReply reply;
             AcceptRequest request = new AcceptRequest { WriteTs = _data.RoundID};
             LeasePaxos lp;
+            int acks = 0;
             //comparar os TS e ver qual vamos aceitar
             if (Other_TS > _data.Write_TS)
             {
@@ -352,9 +352,9 @@ namespace DADKTV_LM
             foreach (PaxosService.PaxosServiceClient stub in _lmcontact.lm_stubs)
             {
                 reply = stub.AcceptAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
-                //if (reply.Ack) promises++;
+                if (reply.Ack) acks++;
             }
-            return true;
+            return acks > (_lmcontact.lm_stubs.Count + 1) / 2; //em vez do count vai ser com o bitmap dos lms que estao vivos
         }
     }
 
