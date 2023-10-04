@@ -47,20 +47,20 @@ namespace DADKTV_LM
                 return;
             }
             LeaseData dt;
-            if (id == 0) dt = new LeaseData(lm_urls, tm_urls, true);
-            else dt = new LeaseData(lm_urls, tm_urls, false);
+            if (id == 0) dt = new LeaseData(true);
+            else dt = new LeaseData(false);
 
 
             Server server = new Server
             {
-                Services = { LeaseService.BindService(new LeageManager(args[0], dt)) ,
-                            PaxosService.BindService(new Paxos(args[0], dt))},
+                Services = { LeaseService.BindService(new LeageManager(args[0], dt, tm_urls, lm_urls)) ,
+                            PaxosService.BindService(new Paxos(args[0], dt, tm_urls, lm_urls))},
                 Ports = { serverPort }
             };
 
             server.Start();
 
-            PaxosLeader pl = new PaxosLeader(args[0], dt, id);
+            PaxosLeader pl = new PaxosLeader(args[0], dt, id, tm_urls, lm_urls);
 
             Console.WriteLine("Insecure server listening on port " + url.Port);
             //Configuring HTTP for client connections in Register method

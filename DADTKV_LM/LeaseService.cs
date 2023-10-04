@@ -29,14 +29,10 @@ namespace DADKTV_LM
 
     public class LeaseData
     {   /* se um lm morrer podemos ter bitmap dos lm vivos */
-        public List<LeaseService.LeaseServiceClient> tm_stubs = new List<LeaseService.LeaseServiceClient>(); //nao quero isto publico mas por agr fica assim
-        public List<PaxosService.PaxosServiceClient> lm_stubs = new List<PaxosService.PaxosServiceClient>();
         List<Request> _requests = new List<Request>(); //requests received from TMs
 
-        public LeaseData(List<string> lm_urls, List<string> tm_urls, bool leader) 
+        public LeaseData(bool leader) 
         {
-            foreach (string url in tm_urls) tm_stubs.Add(new LeaseService.LeaseServiceClient(GrpcChannel.ForAddress(url)));
-            foreach (string url in lm_urls) lm_stubs.Add(new PaxosService.PaxosServiceClient(GrpcChannel.ForAddress(url)));
             RoundID = 0;
             Read_TS = 0;
             Write_TS = 0;
@@ -96,64 +92,20 @@ namespace DADKTV_LM
                 return myValue;
             }
         }
-        public void BroadLease(int epoch, List<Request> leases)
-        {
-            LeaseReply reply;
-            LeaseBroadCastRequest request = new LeaseBroadCastRequest { Epoch = epoch }; //cria request
-            //request.Leases.AddRange(leases);
-            foreach (Request r in leases)
-            { 
-                LeaseProto lp = new LeaseProto { Tm = r.Tm_name };
-                foreach (string k in r.Keys) { lp.Keys.Add(k); }
-                request.Leases.Add(lp);
-            }
-
-            foreach (LeaseService.LeaseServiceClient stub in tm_stubs)
-            {
-                reply = stub.LeaseBroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
-            }
-        }
-        public bool BroadAccepted(AcceptRequest request)
-        {
-            List<int> values = new List<int>(); 
-            values.Add(0);//ack counter
-            values.Add(0);//nack counter
-            foreach (PaxosService.PaxosServiceClient stub in lm_stubs)
-            {
-                Thread t = new Thread(() => { sendAccepted(ref values, stub, request); });
-                t.Start();
-            }
-            lock (values)
-            {
-                while (!(values[0] + 1 >= (lm_stubs.Count + 1) / 2 || values[1] >= (lm_stubs.Count + 1) / 2)) Monitor.Wait(this);
-                if (values[0] + 1 >= (lm_stubs.Count + 1) / 2) return true;
-                else return false;
-            }
-        }
-        private void sendAccepted(ref List<int> values, PaxosService.PaxosServiceClient stub, AcceptRequest request)
-        {
-            AcceptReply reply = stub.AcceptedAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();
-            lock (values)
-            {
-                if (reply.Ack) values[0]++;
-                else values[1]++;
-                Monitor.Pulse(this);
-            }
-        }
-        public bool getLeaderAck()
-        {
-            return lm_stubs[Possible_Leader].GetLeaderAckAsync(new AckRequest(),new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult().Ack;
-        }
     }
 
     public class LeageManager : LeaseService.LeaseServiceBase
     {
         private string _name;
         private LeaseData _data;
-        public LeageManager(string name, LeaseData data)
+        LmContact _lmcontact;
+        TmContact _tmContact;
+        public LeageManager(string name, LeaseData data, List<string> tm_urls, List<string> lm_urls)
         {
             _name = name;
             _data = data;
+            _tmContact = new TmContact(tm_urls);
+            _lmcontact = new LmContact(name, lm_urls);
         }
 
         public override Task<LeaseReply> Lease(LeaseRequest request, ServerCallContext context)
@@ -168,7 +120,7 @@ namespace DADKTV_LM
 
         public void BroadcastLease(int epoch, List<Request> leases)
         {
-            _data.BroadLease(epoch, leases);
+            _tmContact.BroadLease(epoch, leases);
         }
     }
 
@@ -176,13 +128,17 @@ namespace DADKTV_LM
     public class Paxos : PaxosService.PaxosServiceBase
     {
         private LeaseData _data;
+        LmContact _lmcontact;
+        TmContact _tmContact;
 
-        public Paxos(string name, LeaseData data)
+        public Paxos(string name, LeaseData data, List<string> tm_urls, List<string> lm_urls)
         {
             Name = name;
             _data = data;
             //When paxos is called needs to select the requests that don´t conflict to define our value
             My_value = _data.GetMyValue();
+            _tmContact = new TmContact(tm_urls);
+            _lmcontact = new LmContact(name, lm_urls);
         }
         public string Name { get; }
         public List<Request> My_value { set; get; }
@@ -234,7 +190,7 @@ namespace DADKTV_LM
             }
 
             //broadcast accept
-            bool result = _data.BroadAccepted(request);
+            bool result = _lmcontact.BroadAccepted(request);
             //só aplica o valor recebido depois de receber uma maioria de accepted dos outros, falta essa msg no proto
             lock (this)
             {
@@ -280,8 +236,10 @@ namespace DADKTV_LM
     public class PaxosLeader
     {
         private LeaseData _data;
+        LmContact _lmcontact;
+        TmContact _tmContact;
 
-        public PaxosLeader(string name, LeaseData data, int id)
+        public PaxosLeader(string name, LeaseData data, int id, List<string> tm_urls, List<string> lm_urls)
         {
             Name = name;
             Others_value = new List<Request>();
@@ -290,6 +248,8 @@ namespace DADKTV_LM
             Id = id;
             Epoch = 0;
             My_value = _data.GetMyValue();
+            _tmContact = new TmContact(tm_urls);
+            _lmcontact = new LmContact(name, lm_urls);
 
             if (PrepareRequest()) AcceptRequest();
         }
@@ -315,7 +275,7 @@ namespace DADKTV_LM
                         possible_leader = _data.Possible_Leader;
                         if (Id == possible_leader + 1) // depois ver tambem se é o seguinte no bitmap que esteja vivo
                         {
-                            ack = _data.getLeaderAck();
+                            ack = _lmcontact.getLeaderAck(_data.Possible_Leader);
                         }
                     }
                 }
@@ -326,13 +286,14 @@ namespace DADKTV_LM
                         Epoch = Epoch + 1; //implementar tempo
                         while (!PrepareRequest())
                         {
-                                _data.RoundID = Other_TS + 1;//evitamos fazer muitas vezes inuteis
+                            _data.RoundID = Other_TS + 1;//evitamos fazer muitas vezes inuteis
                         }
                         if (AcceptRequest())
                         {
-                                _data.Write_TS = _data.RoundID;//evitamos fazer muitas vezes inuteis
+                            _data.Write_TS = _data.RoundID;//evitamos fazer muitas vezes inuteis
                                                                //eliminar os requests
-                                _data.BroadLease(Id, _data.GetMyValue());
+                            _tmContact.BroadLease(Id, _data.GetMyValue());
+                                
                         }
                         //x em x tempo faz
                     }
@@ -345,7 +306,7 @@ namespace DADKTV_LM
             PrepareRequest request = new PrepareRequest { RoundId = _data.IncrementRoundID() };
             Promise reply;
             int promises = 0;
-            foreach (PaxosService.PaxosServiceClient stub in _data.lm_stubs)
+            foreach (PaxosService.PaxosServiceClient stub in _lmcontact.lm_stubs)
             {
                 reply = stub.PrepareAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
                 if (reply.Ack) promises++;
@@ -360,7 +321,7 @@ namespace DADKTV_LM
                     Other_TS = reply.WriteTs;
                 }
             }
-            return promises > (_data.lm_stubs.Count + 1) / 2; //true se for maioria, removemos da lista se morrerem?
+            return promises > (_lmcontact.lm_stubs.Count + 1) / 2; //true se for maioria, removemos da lista se morrerem?
         }
 
         public bool AcceptRequest()
@@ -388,12 +349,80 @@ namespace DADKTV_LM
                 }
             }
             request.LeaderId = Id;
-            foreach (PaxosService.PaxosServiceClient stub in _data.lm_stubs)
+            foreach (PaxosService.PaxosServiceClient stub in _lmcontact.lm_stubs)
             {
                 reply = stub.AcceptAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
                 //if (reply.Ack) promises++;
             }
             return true;
+        }
+    }
+
+    public class TmContact
+    {
+        List<LeaseService.LeaseServiceClient> tm_stubs = new List<LeaseService.LeaseServiceClient>();
+        public TmContact(List<string> tm_urls)
+        {
+            foreach (string url in tm_urls) tm_stubs.Add(new LeaseService.LeaseServiceClient(GrpcChannel.ForAddress(url)));
+        }
+        public void BroadLease(int epoch, List<Request> leases)
+        {
+            LeaseReply reply;
+            LeaseBroadCastRequest request = new LeaseBroadCastRequest { Epoch = epoch }; //cria request
+            //request.Leases.AddRange(leases);
+            foreach (Request r in leases)
+            {
+                LeaseProto lp = new LeaseProto { Tm = r.Tm_name };
+                foreach (string k in r.Keys) { lp.Keys.Add(k); }
+                request.Leases.Add(lp);
+            }
+
+            foreach (LeaseService.LeaseServiceClient stub in tm_stubs)
+            {
+                reply = stub.LeaseBroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
+            }
+        }
+    }
+
+    public class LmContact
+    {
+        private string _name;
+        public List<PaxosService.PaxosServiceClient> lm_stubs = new List<PaxosService.PaxosServiceClient>();
+        public LmContact(string name, List<string> lm_urls)
+        {
+            _name = name;
+            foreach (string url in lm_urls) lm_stubs.Add(new PaxosService.PaxosServiceClient(GrpcChannel.ForAddress(url)));
+        }
+        public bool BroadAccepted(AcceptRequest request)
+        {
+            List<int> values = new List<int>();
+            values.Add(0);//ack counter
+            values.Add(0);//nack counter
+            foreach (PaxosService.PaxosServiceClient stub in lm_stubs)
+            {
+                Thread t = new Thread(() => { sendAccepted(ref values, stub, request); });
+                t.Start();
+            }
+            lock (values)
+            {
+                while (!(values[0] + 1 >= (lm_stubs.Count + 1) / 2 || values[1] >= (lm_stubs.Count + 1) / 2)) Monitor.Wait(this);
+                if (values[0] + 1 >= (lm_stubs.Count + 1) / 2) return true;
+                else return false;
+            }
+        }
+        private void sendAccepted(ref List<int> values, PaxosService.PaxosServiceClient stub, AcceptRequest request)
+        {
+            AcceptReply reply = stub.AcceptedAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();
+            lock (values)
+            {
+                if (reply.Ack) values[0]++;
+                else values[1]++;
+                Monitor.Pulse(this);
+            }
+        }
+        public bool getLeaderAck(int possible_leader)
+        {
+            return lm_stubs[possible_leader].GetLeaderAckAsync(new AckRequest(), new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult().Ack;
         }
     }
 }
