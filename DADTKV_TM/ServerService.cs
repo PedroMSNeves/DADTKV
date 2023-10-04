@@ -45,13 +45,25 @@ namespace DADTKV_TM
         public List<DadIntProto> Writes { get; }
         public int Transaction_number { set; get; }
     }
+
+    public struct resultOfTransaction
+    {
+        public resultOfTransaction(List<DadIntProto> result, int error_code)
+        {
+            Result = result;
+            Error_code = error_code;
+        }
+        public List<DadIntProto> Result { get; }
+        public int Error_code { get; }
+
+    }
     /// <summary>
     /// Class that stores the transaction requests and their results    
     /// </summary>
     public class RequestList
     {
         Request[] buffer;
-        Dictionary<int,List<DadIntProto>> result;
+        Dictionary<int, resultOfTransaction> result;
         private int MAX;
         private int buzy = 0;
         private int cursorIN = 0;
@@ -59,24 +71,23 @@ namespace DADTKV_TM
         private int transaction_number = 0;
         public RequestList(int size) 
         {
-            result = new Dictionary<int, List<DadIntProto>>();
+            result = new Dictionary<int, resultOfTransaction>();
             buffer = new Request[size];
             MAX = size;
         }
-        public void Insert(List<string> reads, List<DadIntProto> writes)
+        public int insert(List<string> reads, List<DadIntProto> writes)
         {
-            insert(new Request(reads, writes, transaction_number++));
-        }
-        private void insert(Request req)
-        {
+            int tnumber;
             lock (this)
             {
                 while (buzy == MAX) Monitor.Wait(this);
-                buffer[cursorIN] = req;
+                tnumber = transaction_number++;
+                buffer[cursorIN] = new Request(reads, writes, tnumber);
                 this.cursorIN = ++this.cursorIN % this.MAX;
                 buzy++;
                 Monitor.PulseAll(this);
             }
+            return tnumber;
         }
         public Request execute()
         {
@@ -94,17 +105,17 @@ namespace DADTKV_TM
             }
             return req;
         }
-        public void move(int transaction_number, List<DadIntProto> resultT)
+        public void move(int transaction_number, List<DadIntProto> resultT, int err)
         {
             lock (this)
             {
-                result.Add(transaction_number, resultT);
+                result.Add(transaction_number, new resultOfTransaction(resultT,err));
                 Monitor.PulseAll(this);
             }
         }
-        public List<DadIntProto> getResult(int t_number)
+        public resultOfTransaction getResult(int t_number)
         {
-            List<DadIntProto> resultT;
+            resultOfTransaction resultT;
             lock (this)
             {
                 while (!result.ContainsKey(t_number))
@@ -133,6 +144,14 @@ namespace DADTKV_TM
             _name = name;
             _store = new Dictionary<string, int>(); // Stores the DadInt data
             _leases = new Dictionary<string, Queue<Lease>>(); // Stores the leases in a Lifo associated with a key (string)
+        }
+        public int insertRequest(List<string> reads, List<DadIntProto> writes)
+        {
+            return _reqList.insert(reads, writes);
+        }
+        public resultOfTransaction getResult(int tnum)
+        {
+            return _reqList.getResult(tnum);
         }
         public int Request(List<string> reads, List<DadIntProto> writes, ref List<DadIntProto> reply, TmContact tmContact)
         {
@@ -216,10 +235,12 @@ namespace DADTKV_TM
             }
             return true;
         }
-        public bool NewLeases(Dictionary<string, string> keyValuePairs, int epoch)
+        public bool NewLeases(Dictionary<string, string> keyValuePairs, int epoch) 
         {
             lock (this) 
-            { // ver intercessao com outras leases e marcar para end
+            { // ver intercessao com outras leases e marcar para end// nao so com as atuais mas entre as novas tambem
+                //ex recebe 1a 1a marca o primeiro para end (apenas marca os nossos)
+                //ex recebe 1a 2a 1a  marca o primeiro para end 
                 foreach (KeyValuePair<string, string> pair in keyValuePairs) 
                 {
                     foreach (Lease lease in _leases[pair.Key]) if (pair.Value == _name) lease.End = true;// marcar as nossas
@@ -227,7 +248,7 @@ namespace DADTKV_TM
                     _leases[pair.Key].Enqueue(new Lease(pair.Value, epoch));  
                 }
             }
-            return true;
+            return true; 
         }
     }
     /// <summary>
@@ -250,28 +271,18 @@ namespace DADTKV_TM
         }
         public TxReply TxSub(TxRequest request)
         {
-            List<DadIntProto> reply = new List<DadIntProto>();
+            resultOfTransaction reply;
             List<string> reads = request.Reads.ToList();
             List<DadIntProto> writes = request.Writes.ToList();
-            bool requested = false; 
-            /* Transaction number associar à entry do request (create class for this)
-             * When a transaction ends, pulse all treads to see if its own is done and removes it from the list
-             */
-            while (true)
-            {
-                int err = _store.Request(reads, writes, ref reply, _tmContact);
-                if (err == 0) break;
-                else if(err == -2) { throw new RpcException(new Status(StatusCode.NotFound, "Read key not found")); }
-                else if (err == -3) { throw new RpcException(new Status(StatusCode.DeadlineExceeded, "Could not broadcast the writes")); }
-                else if (err == -1 && !requested) 
-                {
-                    LeaseRequest(ref reads, ref writes);
-                    requested = true;
-                }
-                //Monitor.Wait(this); meter a esperar até receber novas leases
-            }
 
-            return new TxReply();
+            int tnum = _store.insertRequest(reads, writes);
+            LeaseRequest(ref reads, ref writes);
+            reply = _store.getResult(tnum);
+            if (reply.Error_code == -1) { throw new RpcException(new Status(StatusCode.NotFound, "Read key not found")); }
+            else if (reply.Error_code == -2) { throw new RpcException(new Status(StatusCode.DeadlineExceeded, "Could not broadcast the writes")); }
+            TxReply tx = new TxReply();
+            tx.Reads.AddRange(reply.Result);
+            return tx;
         }
         public bool LeaseRequest(ref List<string> reads,ref List<DadIntProto> writes)
         {
