@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Channels;
@@ -29,6 +30,83 @@ namespace DADTKV_TM
 
         public override string ToString() => $"({Tm_name}, {Epoch}, {End})";
     }
+
+    public class Request
+    {
+        public Request(List<string> reads,List<DadIntProto> writes, int transaction_number)
+        {
+            Reads = reads;
+            Writes = writes;
+            Transaction_number = transaction_number;
+        }
+        public List<string> Reads { get; }
+        public List<DadIntProto> Writes { get; }
+        public int Transaction_number { set; get; }
+    }
+    public class RequestList
+    {
+        Request[] buffer;
+        Dictionary<int,List<DadIntProto>> result;
+        private int MAX;
+        private int buzy = 0;
+        private int cursorIN = 0;
+        private int cursorOUT = 0;
+        private int transaction_number = 0;
+        public RequestList(int size) 
+        {
+            result = new Dictionary<int, List<DadIntProto>>();
+            buffer = new Request[size];
+            MAX = size;
+        }
+        public void Insert(List<string> reads, List<DadIntProto> writes)
+        {
+            insert(new Request(reads, writes, transaction_number++));
+        }
+        private void insert(Request req)
+        {
+            lock (this)
+            {
+                while (buzy == MAX) Monitor.Wait(this);
+                buffer[cursorIN] = req;
+                this.cursorIN = ++this.cursorIN % this.MAX;
+                buzy++;
+                Monitor.PulseAll(this);
+            }
+        }
+        public Request execute()
+        {
+            Request req;
+            lock (this)
+            {
+                while (buzy == 0)
+                {
+                    Monitor.Wait(this);
+                }
+                req = buffer[cursorOUT];
+                this.cursorOUT = ++this.cursorOUT % this.MAX;
+                buzy--;
+                Monitor.PulseAll(this);
+            }
+            return req;
+        }
+        public void move(int transaction_number, List<DadIntProto> resultT)
+        {
+            lock (this)
+            {
+                result.Add(transaction_number, resultT);
+                Monitor.PulseAll(this);
+            }
+        }
+        public List<DadIntProto> getResult(int t_number)
+        {
+            List<DadIntProto> resultT;
+            lock (this)
+            
+
+            return resultT;
+        }
+    }
+
     /// <summary>
     /// Where data is stored
     /// </summary>
@@ -37,8 +115,10 @@ namespace DADTKV_TM
         private string _name;
         private Dictionary<string, int> _store;
         private Dictionary<string, Queue<Lease>> _leases;
+        private RequestList _reqList;
         public Store(string name)
         {
+            _reqList = new RequestList(10); // maximum of requests waiting allowed
             _name = name;
             _store = new Dictionary<string, int>(); // Stores the DadInt data
             _leases = new Dictionary<string, Queue<Lease>>(); // Stores the leases in a Lifo associated with a key (string)
@@ -163,7 +243,9 @@ namespace DADTKV_TM
             List<string> reads = request.Reads.ToList();
             List<DadIntProto> writes = request.Writes.ToList();
             bool requested = false; 
-
+            /* Transaction number associar à entry do request (create class for this)
+             * When a transaction ends, pulse all treads to see if its own is done and removes it from the list
+             */
             while (true)
             {
                 int err = _store.Request(reads, writes, ref reply, _tmContact);
@@ -318,6 +400,22 @@ namespace DADTKV_TM
                 }
             }
             return new LeaseReply { Ack = store.NewLeases(keyValuePairs,request.Epoch) };
+        }
+    }
+    
+    public class MainThread
+    {
+        Store _store;
+        public MainThread(Store st) 
+        {
+            _store = st;
+        }
+        public void cycle()
+        {
+            while (true)
+            {
+                
+            }
         }
     }
 }

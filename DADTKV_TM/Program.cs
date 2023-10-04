@@ -69,7 +69,10 @@ namespace DADTKV_TM
 
             Console.WriteLine("Insecure server listening on host " + url.Host + " port " + url.Port);
             AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
-            while (true) ;
+
+            // Creates the cycle for the main thread, the thread that executes the transactions
+            MainThread mt = new MainThread(st);
+            mt.cycle();
         }
     }
 }
