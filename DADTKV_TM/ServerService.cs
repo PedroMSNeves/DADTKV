@@ -31,6 +31,15 @@ namespace DADTKV_TM
         public override string ToString() => $"({Tm_name}, {Epoch}, {End})";
     }
     /// <summary>
+    /// Enum to retain the information about the lease request
+    /// </summary>
+    public enum leaseRequested
+    {
+        No,
+        Maybe,
+        Yes
+    }
+    /// <summary>
     /// Class for storing the information of a transaction request
     /// </summary>
     public class Request
@@ -40,7 +49,9 @@ namespace DADTKV_TM
             Reads = reads;
             Writes = writes;
             Transaction_number = transaction_number;
+            Situation = leaseRequested.No;
         }
+        public leaseRequested Situation { set; get; }
         public List<string> Reads { get; }
         public List<DadIntProto> Writes { get; }
         public int Transaction_number { set; get; }
@@ -241,9 +252,13 @@ namespace DADTKV_TM
             { // ver intercessao com outras leases e marcar para end// nao so com as atuais mas entre as novas tambem
                 //ex recebe 1a 1a marca o primeiro para end (apenas marca os nossos)
                 //ex recebe 1a 2a 1a  marca o primeiro para end 
+                // NOT WORKING FOR EVERY CASE YET
                 foreach (KeyValuePair<string, string> pair in keyValuePairs) 
                 {
-                    foreach (Lease lease in _leases[pair.Key]) if (pair.Value == _name) lease.End = true;// marcar as nossas
+                    foreach (Lease lease in _leases[pair.Key]) 
+                        if (pair.Value == _name){
+                            lease.End = true;// marcar as nossas
+                        }
 
                     _leases[pair.Key].Enqueue(new Lease(pair.Value, epoch));  
                 }
@@ -257,8 +272,8 @@ namespace DADTKV_TM
     public class ServerService : TmService.TmServiceBase
     {
         Store _store;
-        LmContact _lmcontact;
-        TmContact _tmContact;
+        LmContact _lmcontact;//é para tirar
+        TmContact _tmContact;//é para tirar
         public ServerService(Store store, string name, List<string> tm_urls, List<string> lm_urls)
         {
             _store = store;
@@ -276,15 +291,16 @@ namespace DADTKV_TM
             List<DadIntProto> writes = request.Writes.ToList();
 
             int tnum = _store.insertRequest(reads, writes);
-            LeaseRequest(ref reads, ref writes);
             reply = _store.getResult(tnum);
             if (reply.Error_code == -1) { throw new RpcException(new Status(StatusCode.NotFound, "Read key not found")); }
             else if (reply.Error_code == -2) { throw new RpcException(new Status(StatusCode.DeadlineExceeded, "Could not broadcast the writes")); }
+            
             TxReply tx = new TxReply();
             tx.Reads.AddRange(reply.Result);
+
             return tx;
         }
-        public bool LeaseRequest(ref List<string> reads,ref List<DadIntProto> writes)
+        /*public bool LeaseRequest(ref List<string> reads,ref List<DadIntProto> writes)
         {
             List<string> keys = new List<string>();
             foreach (string key in reads) { keys.Add(key); }
@@ -293,7 +309,7 @@ namespace DADTKV_TM
             _lmcontact.RequestLease(keys); //try catch
 
             return true;
-        }
+        }*/
     }
     /// <summary>
     /// Conctact with Lease Manager, to request new leases
@@ -436,7 +452,7 @@ namespace DADTKV_TM
         {
             while (true)
             {
-                
+
             }
         }
     }
