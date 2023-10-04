@@ -1,15 +1,4 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Channels;
-using System.Threading.Tasks;
-using System.Xml.Linq;
-using Grpc.Core;
-using Grpc.Net.Client;
-using DADTKV_TM.Contact;
+﻿using DADTKV_TM.Contact;
 using DADTKV_TM.Structs;
 
 namespace DADTKV_TM
@@ -51,7 +40,7 @@ namespace DADTKV_TM
                         {
                             Lease lease = queue.Peek();
                             if (lease.Tm_name != _name) return -1;
-                            if(lease.End) epoch.Add(lease.Epoch); 
+                            if (lease.End) epoch.Add(lease.Epoch);
                         }
                         catch (InvalidOperationException ex) { return -1; }
                     }
@@ -79,10 +68,10 @@ namespace DADTKV_TM
 
                 epoch = epoch.Distinct().ToList(); //maybe depois fechar todas as suas marcadas para fechar, senao pode dar deadlock
                 if (!tmContact.BroadCastChanges(writes, name, epoch)) return -3;
-                foreach(string key in reads) reply.Add(new DadIntProto{ Key = key , Value = _store[key] });
-                foreach(DadIntProto write in writes) _store[write.Key] = write.Value; //testar se cria a key mesmo se nao tiver la 
+                foreach (string key in reads) reply.Add(new DadIntProto { Key = key, Value = _store[key] });
+                foreach (DadIntProto write in writes) _store[write.Key] = write.Value; //testar se cria a key mesmo se nao tiver la 
             }
-            
+
             return 0;
         }
         public bool Write(List<DadIntTmProto> writes, string tm_name, List<int> epoch)
@@ -90,18 +79,18 @@ namespace DADTKV_TM
             lock (this)
             {
                 foreach (DadIntTmProto write in writes) { _store[write.Key] = write.Value; }
-                if(tm_name != null) LeaseRemove(tm_name, epoch);
+                if (tm_name != null) LeaseRemove(tm_name, epoch);
             }
             return true; // possivelmente tratamento de erros depois
         }
-        public bool LeaseRemove(string tm_name, List<int> epoch) 
+        public bool LeaseRemove(string tm_name, List<int> epoch)
         {
             /* apagar todas as incidencias da lease em questao nao so a primeira
               a t1,t2,t32
               b t2
               c t31, t1
             */
-            foreach (KeyValuePair<string,Queue<Lease>> pair in _leases)
+            foreach (KeyValuePair<string, Queue<Lease>> pair in _leases)
             {
                 bool remove = true;
                 foreach (Lease l1 in pair.Value)
@@ -116,28 +105,29 @@ namespace DADTKV_TM
                         remove = true;
                     }
                     else remove = false;
-                }   
+                }
             }
             return true;
         }
-        public bool NewLeases(Dictionary<string, string> keyValuePairs, int epoch) 
+        public bool NewLeases(Dictionary<string, string> keyValuePairs, int epoch)
         {
-            lock (this) 
+            lock (this)
             { // ver intercessao com outras leases e marcar para end// nao so com as atuais mas entre as novas tambem
                 //ex recebe 1a 1a marca o primeiro para end (apenas marca os nossos)
                 //ex recebe 1a 2a 1a  marca o primeiro para end 
                 // NOT WORKING FOR EVERY CASE YET
-                foreach (KeyValuePair<string, string> pair in keyValuePairs) 
+                foreach (KeyValuePair<string, string> pair in keyValuePairs)
                 {
-                    foreach (Lease lease in _leases[pair.Key]) 
-                        if (pair.Value == _name){
+                    foreach (Lease lease in _leases[pair.Key])
+                        if (pair.Value == _name)
+                        {
                             lease.End = true;// marcar as nossas
                         }
 
-                    _leases[pair.Key].Enqueue(new Lease(pair.Value, epoch));  
+                    _leases[pair.Key].Enqueue(new Lease(pair.Value, epoch));
                 }
             }
-            return true; 
+            return true;
         }
     }
 }

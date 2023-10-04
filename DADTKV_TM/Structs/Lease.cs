@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace DADTKV_TM.Structs
+﻿namespace DADTKV_TM.Structs
 {
     /// <summary>
     /// Class lease for storing information about a certain lease

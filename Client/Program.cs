@@ -1,14 +1,4 @@
-﻿
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Security;
-using System.Threading;
-using System.Threading.Tasks;
-using Parse_Lib;
-
-namespace Client
+﻿namespace Client
 {
 
     class Program

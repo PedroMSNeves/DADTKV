@@ -1,7 +1,5 @@
-﻿using Grpc.Core;
-using Grpc.Net.Client;
-using System;
-using DADTKV_TM.Impls;
+﻿using DADTKV_TM.Impls;
+using Grpc.Core;
 
 namespace DADTKV_TM
 {
@@ -9,7 +7,7 @@ namespace DADTKV_TM
     class Program
     {
         // Receives input like "Tm1 myurl othertmurl1 othertmurl2 LM lmurl1 lmurl2" (name,hisurl,otherurl...,LM(delimiter),lmurl...)
-        private static void getUrls(string[] args,ref List<string> tm_urls, ref List<string> lm_urls)
+        private static void getUrls(string[] args, ref List<string> tm_urls, ref List<string> lm_urls)
         {
             if (args.Length < 4) // Minimum is name, his own url the LM delimiter and 1 Lm url
             {
@@ -22,17 +20,17 @@ namespace DADTKV_TM
             for (int i = 2; i < args.Length; i++)
             {
                 if (args[i].Equals("LM")) lm = true;
-                else if(!lm) tm_urls.Add(args[i]);
+                else if (!lm) tm_urls.Add(args[i]);
                 else lm_urls.Add(args[i]);
             }
-            if(!lm) 
+            if (!lm)
             {
                 Console.WriteLine("ERROR: Invalid number of args. No LeaseManagers provided");
                 Console.WriteLine("Press any key to close");
                 Console.ReadKey();
                 Environment.Exit(0);
             }
-            
+
         }
 
 
@@ -56,7 +54,7 @@ namespace DADTKV_TM
             ServerPort serverPort = new ServerPort(url.Host, url.Port, ServerCredentials.Insecure);
 
             // Store is shared by the various services
-            Store st = new Store(args[0]); 
+            Store st = new Store(args[0]);
             Server server = new Server
             {
                 Services = { TmService.BindService(new ServerService(st, args[0], tm_urls, lm_urls)),
