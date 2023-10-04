@@ -8,11 +8,10 @@ namespace DADTKV_TM
 
     class Program
     {
-        // recieves input like "Tm1 myurl othertmurl1 othertmurl2 LM lmurl1 lmurl2" (name,hisurl,otherurl...,LM(delimiter),lmurl...)
-
+        // Receives input like "Tm1 myurl othertmurl1 othertmurl2 LM lmurl1 lmurl2" (name,hisurl,otherurl...,LM(delimiter),lmurl...)
         private static void getUrls(string[] args,ref List<string> tm_urls, ref List<string> lm_urls)
         {
-            if (args.Length < 4) //minimum is name, his own url the LM delimiter and 1 Lm url
+            if (args.Length < 4) // Minimum is name, his own url the LM delimiter and 1 Lm url
             {
                 Console.WriteLine("ERROR: Invalid number of args");
                 Console.WriteLine("Press any key to close");
@@ -41,11 +40,23 @@ namespace DADTKV_TM
         {
             List<string> tm_urls = new List<string>();
             List<string> lm_urls = new List<string>();
+            Uri url;
             getUrls(args, ref tm_urls, ref lm_urls); // gets all url servers minus his
-            Uri url = new Uri(args[1]); // gets his url 
-            ServerPort serverPort = new ServerPort(url.Host, url.Port, ServerCredentials.Insecure); //maybe apanha erros do url
+            try
+            {
+                url = new Uri(args[1]); // gets his url 
+            }
+            catch (System.UriFormatException ex)
+            {
+                Console.WriteLine("ERROR: Invalid url (self)");
+                Console.WriteLine("Press any key to close");
+                Console.ReadKey();
+                return;
+            }
+            ServerPort serverPort = new ServerPort(url.Host, url.Port, ServerCredentials.Insecure);
 
-            Store st = new Store(args[0]); // para depois pudermos ter a store a ser mudada pelos varios servicos
+            // Store is shared by the various services
+            Store st = new Store(args[0]); 
             Server server = new Server
             {
                 Services = { TmService.BindService(new ServerService(st, args[0], tm_urls, lm_urls)),
@@ -56,8 +67,7 @@ namespace DADTKV_TM
 
             server.Start();
 
-            Console.WriteLine("Insecure server listening on port " + url.Port);
-            //Configuring HTTP for client connections in Register method
+            Console.WriteLine("Insecure server listening on host " + url.Host + " port " + url.Port);
             AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
             while (true) ;
         }

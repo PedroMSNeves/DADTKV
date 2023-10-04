@@ -12,7 +12,7 @@ namespace Client
 {
 
     class Program
-    {
+    { /* Input: "Name tmurl1 tmurl2 ...*/
         private static ClientLogic args_prep(string[] args)
         {
             ClientLogic clientLogic;
@@ -45,11 +45,17 @@ namespace Client
                     case 'W':
                         clientLogic.Sleep(); // verificar read dentro da funcao 
                         break;
+                    case 'S':
+                        clientLogic.Status(); // vai buscar o estado de cada server
+                        /* Perguntar se temos de meter o estado te todos os clients,tm e lm ou se chega apenas dos tm
+                         * Possivelmente podemos meter cada tm a dizer o que pensa dos outros tm e lm (de quem suspeita)
+                         */
+                        break;
                     case '#':
-                        while (Console.ReadKey().KeyChar != '\n') ; //ignora a linha
+                        while (Console.ReadKey().KeyChar != '\n') ; // Reads and ignores line
                         break;
                     case ' ':
-                        break; // it will read the next char
+                        break; // It will read the next char
                 }
             }
         }

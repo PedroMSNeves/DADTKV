@@ -7,18 +7,38 @@ namespace DADTKV_Client_Lib
     {
         private List<GrpcChannel> channels;
         private TmService.TmServiceClient tm;
-        private int tm_cursor; // futuramente ira ser usado para saber o "nosso" tm, updated quando esse tm nao responder
+        private int tm_cursor;
 
         public DADTKV_Client()
         {
             channels = new List<GrpcChannel>();
-            tm = null;
+            tm = null; //starts null, for us to define in the first time it's used
             tm_cursor = 0;
         }
+        /// <summary>
+        /// Adds Tm server url and detects invalid url's
+        /// </summary>
+        /// <param name="url"></param>
         public void AddServer(string url)
         {
-            channels.Add(GrpcChannel.ForAddress(url)); // error detection
+            try
+            {
+                channels.Add(GrpcChannel.ForAddress(url));
+            }
+            catch (System.UriFormatException ex)
+            {
+                Console.WriteLine("ERROR: Invalid url");
+            }
+            
         }
+        /// <summary>
+        /// Receives the client name, read list and write list for a transaction
+        /// Prepares the transaction and then requests it
+        /// </summary>
+        /// <param name="cname"></param>
+        /// <param name="read"></param>
+        /// <param name="write"></param>
+        /// <returns></returns>
         public List<DadInt> TxSubmit(string cname, List<string> read,List<DadInt> write)
         {
             TxReply reply;
@@ -29,31 +49,36 @@ namespace DADTKV_Client_Lib
 
             if(tm == null)
             {
-                foreach (char c in cname) tm_cursor += (int) c; //calcular o valor do nome
-                tm_cursor = tm_cursor % channels.Count(); // saber que server vai escolher
+                // We calculate the server, to use, this way, to have a "good" distribuition of the clients to the servers
+                foreach (char c in cname) tm_cursor += (int) c; // calculate value of name
+                tm_cursor = tm_cursor % channels.Count(); // chooses one of the servers
                 tm = new TmService.TmServiceClient(channels[tm_cursor]);
             }
             try
             {
-                reply = tm.TxSubmitAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();
+                reply = tm.TxSubmitAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(15))).GetAwaiter().GetResult();
             }
             catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded || ex.StatusCode == StatusCode.Unavailable)
             {
-                Console.WriteLine("Couldn't contact Server");
+                Console.WriteLine("ERROR: Couldn't contact Server, please try again");
                 tm_cursor= ++tm_cursor % channels.Count();
-                tm = new TmService.TmServiceClient(channels[tm_cursor]); // muda o servidor que estava a contactar
+                tm = new TmService.TmServiceClient(channels[tm_cursor]); // Changes the server to contact in the next request
                 return new List<DadInt>();
             }
             foreach ( DadIntProto dad in reply.Reads) { result.Add(new DadInt(dad.Key, dad.Value)); }
+            Console.WriteLine("Transaction succeded!");
             return result;
         }
-        public bool Status()
+        public bool Status() // por enquanto nao faz nada, visto que os servidores ainda nao dao crash
         {
             //TODO
             return true;
         }
 
     }
+    /// <summary>
+    /// Struct of DadInt, a pair of key (string), value (int)
+    /// </summary>
     public struct DadInt
     {
         public DadInt(string key, int val)
