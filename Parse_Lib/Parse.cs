@@ -2,6 +2,10 @@
 {
     public class Parse
     {
+        /// <summary>
+        /// Tries to read an int from the input, gives -1 if it does not succeed
+        /// </summary>
+        /// <returns></returns>
         public static int ParseInt()
         {
             int val;
@@ -11,6 +15,10 @@
             if (int.TryParse(newline, out val)) return val;
             return -1;
         }
+        /// <summary>
+        /// Tries to parse the string to have a string with no "normal" spaces (does not eliminate the spaces in names)
+        /// </summary>
+        /// <returns></returns>
         public static string ParseStringNoSpaces()
         {
             string newline = Console.ReadLine();
@@ -28,6 +36,13 @@
             }
             return reduced;
         }
+        /// <summary>
+        /// Tries to parse the read part of a transaction, from a string to a List of strings
+        /// </summary>
+        /// <param name="newline"></param>
+        /// <param name="i"></param>
+        /// <param name="reads"></param>
+        /// <returns></returns>
         public static bool ParseReads(string newline, ref int i, out List<string> reads) 
         {
             reads = new List<string>();
@@ -47,6 +62,13 @@
             if (i >= newline.Length) return false;
             return true;
         }
+        /// <summary>
+        /// Tries to parse the write part of a transaction, from a string to a Dictionary of <string,int> (key,value)
+        /// </summary>
+        /// <param name="newline"></param>
+        /// <param name="i"></param>
+        /// <param name="writes"></param>
+        /// <returns></returns>
         public static bool ParseWrites(string newline, ref int i, out Dictionary<string, int> writes)
         {
             writes = new Dictionary<string, int>();
@@ -65,6 +87,14 @@
             if (i >= newline.Length) return false;
             return true;
         }
+        /// <summary>
+        /// Tries to parse an entry of a Dictionary of <string,int> (key,value)
+        /// </summary>
+        /// <param name="newline"></param>
+        /// <param name="i"></param>
+        /// <param name="name"></param>
+        /// <param name="val"></param>
+        /// <returns></returns>
         public static bool ParseDict(string newline, ref int i, out string name, out int val)
         {
             name = "";
@@ -78,6 +108,13 @@
             if (!ParseNumber(newline, ref i, ref val)) return false;            
             return true;
         }
+        /// <summary>
+        /// Tries to parse a number from a string
+        /// </summary>
+        /// <param name="newline"></param>
+        /// <param name="i"></param>
+        /// <param name="val"></param>
+        /// <returns></returns>
         public static bool ParseNumber(string newline, ref int i, ref int val)
         {
             bool neg = false;
@@ -99,6 +136,13 @@
             if (neg) val = -val;
             return true;
         }
+        /// <summary>
+        /// Tries to parse a name string from the string
+        /// </summary>
+        /// <param name="newline"></param>
+        /// <param name="i"></param>
+        /// <param name="name"></param>
+        /// <returns></returns>
         public static bool ParseString(string newline, ref int i, ref string name)
         {
             if (newline[i] != '"') return false;

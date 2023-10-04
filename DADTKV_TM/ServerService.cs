@@ -40,8 +40,8 @@ namespace DADTKV_TM
         public Store(string name)
         {
             _name = name;
-            _store = new Dictionary<string, int>();
-            _leases = new Dictionary<string, Queue<Lease>>(); // guarda as leases num fifo associadas a uma string
+            _store = new Dictionary<string, int>(); // Stores the DadInt data
+            _leases = new Dictionary<string, Queue<Lease>>(); // Stores the leases in a Lifo associated with a key (string)
         }
         public int Request(List<string> reads, List<DadIntProto> writes, ref List<DadIntProto> reply, TmContact tmContact)
         {
@@ -152,21 +152,17 @@ namespace DADTKV_TM
             _store = store;
             _tmContact = new TmContact(tm_urls);
             _lmcontact = new LmContact(name,lm_urls);
-            //foreach(string url in tm_urls)
         }
-        public override Task<TxReply> TxSubmit(TxRequest request, ServerCallContext context) // devolve task
+        public override Task<TxReply> TxSubmit(TxRequest request, ServerCallContext context) // Returns task
         {
             return Task.FromResult(TxSub(request));
         }
-        public TxReply TxSub(TxRequest request) //cumpre o pedido
+        public TxReply TxSub(TxRequest request)
         {
             List<DadIntProto> reply = new List<DadIntProto>();
             List<string> reads = request.Reads.ToList();
             List<DadIntProto> writes = request.Writes.ToList();
             bool requested = false; 
-
-            //foreach (string st in request.Reads) { reads.Add(st); }
-            //foreach (DadIntProto dad in request.Writes) { writes.Add(dad); }
 
             while (true)
             {
@@ -196,7 +192,7 @@ namespace DADTKV_TM
         }
     }
     /// <summary>
-    /// Conctact with Lease Manager
+    /// Conctact with Lease Manager, to request new leases
     /// </summary>
     public class LmContact
     {
@@ -207,7 +203,18 @@ namespace DADTKV_TM
         {
             _lease_id = 0;
             _name = name;
-            foreach (string url in lm_urls) lm_stubs.Add(new LeaseService.LeaseServiceClient(GrpcChannel.ForAddress(url)));
+            foreach (string url in lm_urls)
+            {
+                try
+                {
+                    lm_stubs.Add(new LeaseService.LeaseServiceClient(GrpcChannel.ForAddress(url)));
+                }
+                catch (System.UriFormatException ex)
+                {
+                    Console.WriteLine("ERROR: Invalid Lm server url");
+                }
+            }
+            
         }
         public bool RequestLease(List<string> keys)
         {
@@ -217,7 +224,8 @@ namespace DADTKV_TM
 
             foreach (LeaseService.LeaseServiceClient stub in lm_stubs)
             {
-                reply = stub.LeaseAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
+                // Perguntar se basta receber ack de apenas 1 Lm, se precisamos de todos os ack ou uma maioria
+                reply = stub.LeaseAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();
             }
             incrementLeaseId();
             return true;
@@ -232,12 +240,22 @@ namespace DADTKV_TM
         List<BroadCastService.BroadCastServiceClient> tm_stubs = new List<BroadCastService.BroadCastServiceClient>();
         public TmContact(List<string> tm_urls)
         {
-            foreach (string url in tm_urls) tm_stubs.Add(new BroadCastService.BroadCastServiceClient(GrpcChannel.ForAddress(url)));
+            foreach (string url in tm_urls)
+            {
+                try
+                {
+                    tm_stubs.Add(new BroadCastService.BroadCastServiceClient(GrpcChannel.ForAddress(url)));
+                }
+                catch (System.UriFormatException ex)
+                {
+                    Console.WriteLine("ERROR: Invalid Tm server url");
+                }
+            }
         }
         public bool BroadCastChanges(List<DadIntProto> writes, string name, List<int> epoch)
         {
             BroadReply reply;
-            BroadRequest request = new BroadRequest { TmName = name }; //cria request
+            BroadRequest request = new BroadRequest { TmName = name };
             List<DadIntTmProto> writesTm = new List<DadIntTmProto>();
             foreach(DadIntProto tm in writes) writesTm.Add(new DadIntTmProto { Key = tm.Key , Value = tm.Value });
             request.Epoch.AddRange(epoch);
@@ -245,8 +263,11 @@ namespace DADTKV_TM
 
             foreach (BroadCastService.BroadCastServiceClient stub in tm_stubs)
             {
+                // perguntar se temos sempre de receber todos os ack de todos os Tm senão dá revert
+                // propagar para todos os servers corretos
+                // provavelmente meter quando se recebe a dar broadcast again
+                // para isso possivelmente temos uma lista em cada Tm com nºtransacao, nome Tm
                 reply = stub.BroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
-                //nao faz nada com as reply, ainda
             }
             return true;
         }
