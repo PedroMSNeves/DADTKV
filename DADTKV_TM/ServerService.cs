@@ -30,7 +30,9 @@ namespace DADTKV_TM
 
         public override string ToString() => $"({Tm_name}, {Epoch}, {End})";
     }
-
+    /// <summary>
+    /// Class for storing the information of a transaction request
+    /// </summary>
     public class Request
     {
         public Request(List<string> reads,List<DadIntProto> writes, int transaction_number)
@@ -43,6 +45,9 @@ namespace DADTKV_TM
         public List<DadIntProto> Writes { get; }
         public int Transaction_number { set; get; }
     }
+    /// <summary>
+    /// Class that stores the transaction requests and their results    
+    /// </summary>
     public class RequestList
     {
         Request[] buffer;
@@ -101,8 +106,14 @@ namespace DADTKV_TM
         {
             List<DadIntProto> resultT;
             lock (this)
-            
-
+            {
+                while (!result.ContainsKey(t_number))
+                {
+                    Monitor.Wait(this);
+                }
+                resultT = result[t_number];
+                result.Remove(t_number);
+            }
             return resultT;
         }
     }
