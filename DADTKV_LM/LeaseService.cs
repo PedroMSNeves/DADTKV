@@ -291,7 +291,7 @@ namespace DADKTV_LM
                         {
                             _data.Write_TS = _data.RoundID;//evitamos fazer muitas vezes inuteis
                                                                //eliminar os requests
-                            _tmContact.BroadLease(Id, _data.GetMyValue());
+                            _tmContact.BroadLease(Epoch, _data.GetMyValue());
                                 
                         }
                         //x em x tempo faz
