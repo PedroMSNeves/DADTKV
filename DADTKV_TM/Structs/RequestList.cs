@@ -1,23 +1,33 @@
-﻿namespace DADTKV_TM.Structs
+﻿using System.Collections.Generic;
+
+namespace DADTKV_TM.Structs
 {
     /// <summary>
     /// Class that stores the transaction requests and their results    
     /// </summary>
     public class RequestList
     {
-        Request[] buffer;
+        List<Request> buffer;
         Dictionary<int, ResultOfTransaction> result;
         private int MAX;
         private int buzy = 0;
-        private int cursorIN = 0;
-        private int cursorOUT = 0;
         private int transaction_number = 0;
         public RequestList(int size)
         {
             result = new Dictionary<int, ResultOfTransaction>();
-            buffer = new Request[size];
+            buffer = new List<Request>() ;
             MAX = size;
         }
+        public List<Request> GetRequests() 
+        {
+            List<Request> buff;
+            lock (this)
+            {
+                while (buzy == 0) Monitor.Wait(this);
+                buff = buffer;
+            }
+            return buff; 
+        }   
         public int insert(List<string> reads, List<DadIntProto> writes)
         {
             int tnumber;
@@ -25,28 +35,17 @@
             {
                 while (buzy == MAX) Monitor.Wait(this);
                 tnumber = transaction_number++;
-                buffer[cursorIN] = new Request(reads, writes, tnumber);
-                this.cursorIN = ++this.cursorIN % this.MAX;
+                buffer.Add(new Request(reads, writes, tnumber));
                 buzy++;
                 Monitor.PulseAll(this);
             }
             return tnumber;
         }
-        public Request execute()
+        public void remove(int i)
         {
-            Request req;
-            lock (this)
-            {
-                while (buzy == 0)
-                {
-                    Monitor.Wait(this);
-                }
-                req = buffer[cursorOUT];
-                this.cursorOUT = ++this.cursorOUT % this.MAX;
-                buzy--;
-                Monitor.PulseAll(this);
-            }
-            return req;
+            buffer.RemoveAt(i);
+            buzy--;
+            Monitor.PulseAll(this);
         }
         public void move(int transaction_number, List<DadIntProto> resultT, int err)
         {

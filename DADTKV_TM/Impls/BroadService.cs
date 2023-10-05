@@ -19,7 +19,7 @@ namespace DADTKV_TM.Impls
         }
         public BroadReply BCast(BroadRequest request)
         {
-            return new BroadReply { Ack = store.Write(request.Writes.ToList(), request.TmName, request.Epoch.ToList()) };
+            return new BroadReply { Ack = store.Write(request.Writes.ToList(), request.TmName, request.Epoch) };
         }
     }
 }

@@ -10,13 +10,10 @@ namespace DADTKV_TM.Impls
     public class ServerService : TmService.TmServiceBase
     {
         Store _store;
-        LmContact _lmcontact;//é para tirar
-        TmContact _tmContact;//é para tirar
-        public ServerService(Store store, string name, List<string> tm_urls, List<string> lm_urls)
+
+        public ServerService(Store store, string name)
         {
             _store = store;
-            _tmContact = new TmContact(tm_urls);
-            _lmcontact = new LmContact(name, lm_urls);
         }
         public override Task<TxReply> TxSubmit(TxRequest request, ServerCallContext context) // Returns task
         {
@@ -28,10 +25,10 @@ namespace DADTKV_TM.Impls
             List<string> reads = request.Reads.ToList();
             List<DadIntProto> writes = request.Writes.ToList();
 
-            int tnum = _store.insertRequest(reads, writes);
+            int tnum = _store.verifyAndInsertRequest(reads, writes);
+            if (tnum == -1) { throw new RpcException(new Status(StatusCode.NotFound, "Read key not found")); }
             reply = _store.getResult(tnum);
-            if (reply.Error_code == -1) { throw new RpcException(new Status(StatusCode.NotFound, "Read key not found")); }
-            else if (reply.Error_code == -2) { throw new RpcException(new Status(StatusCode.DeadlineExceeded, "Could not broadcast the writes")); }
+            if (reply.Error_code == -2) { throw new RpcException(new Status(StatusCode.DeadlineExceeded, "Could not broadcast the writes")); }
 
             TxReply tx = new TxReply();
             tx.Reads.AddRange(reply.Result);

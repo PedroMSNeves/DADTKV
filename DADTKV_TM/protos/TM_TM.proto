@@ -7,12 +7,13 @@ message DadIntTmProto {
 message BroadRequest {
 	repeated DadIntTmProto writes = 1;
 	string tm_name = 2;
-	repeated int32 epoch = 3;
+	int32 epoch = 3;
 }
 
 message BroadReply {
 	bool ack = 1;
 }
+//mensagem especial para apenas eliminar leases
 
 service BroadCastService {
   rpc BroadCast (BroadRequest) returns (BroadReply);

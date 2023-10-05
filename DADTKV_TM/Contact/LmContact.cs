@@ -21,7 +21,7 @@ namespace DADTKV_TM.Contact
                 {
                     lm_stubs.Add(new LeaseService.LeaseServiceClient(GrpcChannel.ForAddress(url)));
                 }
-                catch (System.UriFormatException ex)
+                catch (System.UriFormatException)
                 {
                     Console.WriteLine("ERROR: Invalid Lm server url");
                 }
@@ -31,7 +31,7 @@ namespace DADTKV_TM.Contact
         public bool RequestLease(List<string> keys)
         {
             LeaseReply reply;
-            LeaseRequest request = new LeaseRequest { Id = _name, LeaseRequestId = _lease_id }; //cria request
+            LeaseRequest request = new LeaseRequest { Id = _name }; //cria request
             request.Keys.AddRange(keys);
 
             foreach (LeaseService.LeaseServiceClient stub in lm_stubs)

@@ -25,7 +25,7 @@ namespace DADTKV_Client_Lib
             {
                 channels.Add(GrpcChannel.ForAddress(url));
             }
-            catch (System.UriFormatException ex)
+            catch (System.UriFormatException)
             {
                 Console.WriteLine("ERROR: Invalid url");
             }

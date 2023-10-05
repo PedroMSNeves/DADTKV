@@ -1,4 +1,5 @@
 ﻿using Grpc.Core;
+using DADTKV_TM.Structs;
 
 namespace DADTKV_TM.Impls
 {
@@ -19,15 +20,13 @@ namespace DADTKV_TM.Impls
         }
         public LeaseReply LBCast(LeaseBroadCastRequest request)
         {
-            Dictionary<string, string> keyValuePairs = new Dictionary<string, string>();
+            List<FullLease> leases = new List<FullLease>();
             foreach (LeaseProto lp in request.Leases)
             {
-                foreach (string key in lp.Keys)
-                {
-                    keyValuePairs[key] = lp.Tm;
-                }
+                leases.Add(new FullLease(lp.Tm,request.Epoch,lp.Keys.ToList()));
             }
-            return new LeaseReply { Ack = store.NewLeases(keyValuePairs, request.Epoch) };
+            store.NewLeases(leases, request.Epoch);
+            return new LeaseReply { Ack = true };
         }
     }
 }

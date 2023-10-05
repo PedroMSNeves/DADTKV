@@ -17,19 +17,18 @@ namespace DADTKV_TM.Contact
                 {
                     tm_stubs.Add(new BroadCastService.BroadCastServiceClient(GrpcChannel.ForAddress(url)));
                 }
-                catch (System.UriFormatException ex)
+                catch (System.UriFormatException)
                 {
                     Console.WriteLine("ERROR: Invalid Tm server url");
                 }
             }
         }
-        public bool BroadCastChanges(List<DadIntProto> writes, string name, List<int> epoch)
+        public bool BroadCastChanges(List<DadIntProto> writes, string name, int epoch)
         {
             BroadReply reply;
-            BroadRequest request = new BroadRequest { TmName = name };
+            BroadRequest request = new BroadRequest { TmName = name, Epoch = epoch };
             List<DadIntTmProto> writesTm = new List<DadIntTmProto>();
             foreach (DadIntProto tm in writes) writesTm.Add(new DadIntTmProto { Key = tm.Key, Value = tm.Value });
-            request.Epoch.AddRange(epoch);
             request.Writes.AddRange(writesTm);
 
             foreach (BroadCastService.BroadCastServiceClient stub in tm_stubs)

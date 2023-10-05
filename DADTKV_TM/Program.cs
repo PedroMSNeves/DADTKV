@@ -44,7 +44,7 @@ namespace DADTKV_TM
             {
                 url = new Uri(args[1]); // gets his url 
             }
-            catch (System.UriFormatException ex)
+            catch (System.UriFormatException)
             {
                 Console.WriteLine("ERROR: Invalid url (self)");
                 Console.WriteLine("Press any key to close");
@@ -54,10 +54,10 @@ namespace DADTKV_TM
             ServerPort serverPort = new ServerPort(url.Host, url.Port, ServerCredentials.Insecure);
 
             // Store is shared by the various services
-            Store st = new Store(args[0]);
+            Store st = new Store(args[0], tm_urls, lm_urls);
             Server server = new Server
             {
-                Services = { TmService.BindService(new ServerService(st, args[0], tm_urls, lm_urls)),
+                Services = { TmService.BindService(new ServerService(st, args[0])),
                             BroadCastService.BindService(new BroadService(st)),
                             LeaseService.BindService(new LService(st)) },
                 Ports = { serverPort }

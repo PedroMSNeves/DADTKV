@@ -20,10 +20,35 @@
             Writes = writes;
             Transaction_number = transaction_number;
             Situation = leaseRequested.No;
+            Keys = GetKeys();
         }
         public leaseRequested Situation { set; get; }
         public List<string> Reads { get; }
         public List<DadIntProto> Writes { get; }
         public int Transaction_number { set; get; }
+
+        public List<string> Keys { get; }
+
+        private List<string> GetKeys()
+        {
+            List<string> keys = new List<string>();
+            foreach (string key in Reads)
+            {
+                keys.Add(key);
+            }
+            foreach (DadIntProto dad in Writes)
+            {
+                keys.Add(dad.Key);
+            }
+            return keys;
+        }
+        public bool SubGroup(Request other)
+        {
+            foreach (string key in Keys)
+            {
+                if (!other.Keys.Contains(key)) return false;
+            }
+            return true;
+        }
     }
 }
