@@ -1,0 +1,116 @@
+﻿using Grpc.Core;
+using Grpc.Net.Client;
+using DADTKV_LM.Contact;
+using DADTKV_LM.Structs;
+
+
+namespace DADTKV_LM.Impls
+{
+    public class Paxos : PaxosService.PaxosServiceBase
+    {
+        private LeaseData _data;
+        LmContact _lmcontact;
+        TmContact _tmContact;
+
+        public Paxos(string name, LeaseData data, List<string> tm_urls, List<string> lm_urls)
+        {
+            Name = name;
+            _data = data;
+            //When paxos is called needs to select the requests that don´t conflict to define our value
+            My_value = _data.GetMyValue();
+            _tmContact = new TmContact(tm_urls);
+            _lmcontact = new LmContact(name, lm_urls);
+        }
+        public string Name { get; }
+        public List<Request> My_value { set; get; }
+
+
+        public override Task<Promise> Prepare(PrepareRequest request, ServerCallContext context)
+        {
+            return Task.FromResult(Prep(request));
+        }
+        public Promise Prep(PrepareRequest request) //returns promise if roundId >  my readTS
+        {
+            Promise reply;
+
+            lock (_data)
+            {
+                if (_data.IsLeader && request.RoundId > _data.RoundID)
+                {
+                    _data.IsLeader = false;
+                }
+                if (request.RoundId <= _data.Read_TS)
+                {
+                    reply = new Promise { Ack = false };
+                    return reply;
+                }
+                _data.Read_TS = request.RoundId;
+                _data.Possible_Leader = request.LeaderId;
+                reply = new Promise { WriteTs = _data.Write_TS, Ack = true };
+                foreach (Request r in My_value)
+                {
+                    LeasePaxos lp = new LeasePaxos { Tm = r.Tm_name };
+                    foreach (string k in r.Keys) { lp.Keys.Add(k); }
+                    reply.Leases.Add(lp);
+                }
+            }
+            return reply;
+        }
+
+        public override Task<AcceptReply> Accept(AcceptRequest request, ServerCallContext context)
+        {
+            return Task.FromResult(Accpt(request));
+        }
+        public AcceptReply Accpt(AcceptRequest request) //quandp recebe Accept e aceita, manda Accepted para todos os outros learners
+        {
+            AcceptReply reply = new AcceptReply();
+            if (request.WriteTs < _data.Read_TS) // precisa de lock
+            {
+                reply.Ack = false;
+                return reply;
+            }
+
+            //broadcast accept
+            bool result = _lmcontact.BroadAccepted(request);
+            //só aplica o valor recebido depois de receber uma maioria de accepted dos outros, falta essa msg no proto
+            lock (this)
+            {
+                if (_data.IsLeader && request.WriteTs > _data.RoundID)
+                {
+                    _data.IsLeader = false;
+                }
+                if (!result) reply.Ack = false;
+                else
+                {
+                    if (request.WriteTs == _data.Read_TS) // se isto nao acontecer e porque deu promise entretanto
+                    {
+                        reply.Ack = true;
+                        foreach (LeasePaxos l in request.Leases)
+                        {
+                            My_value.Add(new Request(l.Tm, l.Keys.ToList()));
+                        }
+                        _data.Possible_Leader = request.LeaderId;
+                    }
+                    else reply.Ack = false;
+                }
+
+            }
+            return reply;
+        }
+        public override Task<AcceptReply> Accepted(AcceptRequest request, ServerCallContext context)
+        {
+            return Task.FromResult(Accpted(request));
+        }
+        public AcceptReply Accpted(AcceptRequest request) //quandp recebe Accept e aceita, manda Accepted para todos os outros learners
+        {
+            AcceptReply reply = new AcceptReply();
+            if (request.WriteTs != _data.Read_TS)
+            {
+                reply.Ack = false;
+                return reply;
+            }
+            reply.Ack = true;
+            return reply;
+        }
+    }
+}
