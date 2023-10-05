@@ -1,7 +1,8 @@
 ﻿using Grpc.Core;
 using System;
+using DADTKV_LM.Impls;
 
-namespace DADKTV_LM
+namespace DADTKV_LM
 {
     class Program
     {
@@ -38,14 +39,18 @@ namespace DADKTV_LM
         {
             List<string> tm_urls = new List<string>();
             List<string> lm_urls = new List<string>();
+
             getUrls(args, ref tm_urls, ref lm_urls); // gets all url servers minus his
             Uri url = new Uri(args[1]); // gets his url 
+
             ServerPort serverPort = new ServerPort(url.Host, url.Port, ServerCredentials.Insecure);
+
             if (!Int32.TryParse(args[2], out int id))
             {
                 Console.WriteLine("ERROR: not a valid Id");
                 return;
             }
+
             LeaseData dt;
             if (id == 0) dt = new LeaseData(true);
             else dt = new LeaseData(false);
