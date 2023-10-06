@@ -43,7 +43,7 @@ namespace ConfigParser
             // Pass all Transaction Manager URLs to the Transaction Manager
             foreach (string transactionManager in transactionManagers)
             {
-                args += $" {transactionManager}";
+                if (transactionManager != url) args += $" {transactionManager}";
             }
 
             args += " LM";
@@ -64,7 +64,7 @@ namespace ConfigParser
             // Pass all Lease Manager URLs to the Lease Manager
             foreach (string leaseManager in leaseManagers)
             {
-                args += $" {leaseManager}";
+                if (leaseManager != url)  args += $" {leaseManager}";
             }
 
             args += " TM";
