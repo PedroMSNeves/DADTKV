@@ -228,10 +228,10 @@ namespace DADTKV_TM
                     List<DadIntProto> reply = new List<DadIntProto>();
 
                     // Tries to propagate
-                    int err = Request(reqs[i].Reads, reqs[i].Writes, ref reply, fl.Epoch);
+                    int err = Request(reqs[i].Reads, reqs[i].Writes, ref reply);
 
                     // Try again, only one time
-                    if (err == -2) err = Request(reqs[i].Reads, reqs[i].Writes, ref reply, fl.Epoch);
+                    if (err == -2) err = Request(reqs[i].Reads, reqs[i].Writes, ref reply);
 
                     // Moves it to the pickup waiting place
                     _reqList.move(reqs[i].Transaction_number, reply, err);
@@ -250,9 +250,9 @@ namespace DADTKV_TM
         /// <param name="reply"></param>
         /// <param name="tmContact"></param>
         /// <returns></returns>
-        public int Request(List<string> reads, List<DadIntProto> writes, ref List<DadIntProto> reply, int epoch)
+        public int Request(List<string> reads, List<DadIntProto> writes, ref List<DadIntProto> reply)
         {
-            if (!_tmContact.BroadCastChanges(writes,_name,epoch)) return -2;
+            if (!_tmContact.BroadCastChanges(writes,_name)) return -2;
             foreach (string key in reads) reply.Add(new DadIntProto { Key = key, Value = _store[key] }); // Does the reads
             foreach (DadIntProto write in writes) _store[write.Key] = write.Value; // Does the writes
             return 0;
@@ -264,15 +264,14 @@ namespace DADTKV_TM
         /// </summary>
         /// <param name="writes"></param>
         /// <param name="tm_name"></param>
-        /// <param name="epoch"></param>
         /// <returns></returns>
-        public bool Write(List<DadIntTmProto> writes, string tm_name, int epoch)
+        public bool Write(List<DadIntTmProto> writes, string tm_name)
         {
             lock (this)
             {
                 if (tm_name != null && writes.Count != 0)
                 {
-                    if (!LeaseRemove(writes[0].Key, tm_name, epoch)) return false; // Always goes well because they are all correct servers
+                    if (!LeaseRemove(writes[0].Key, tm_name)) return false; // Always goes well because they are all correct servers
                 }
                 foreach (DadIntTmProto write in writes) { _store[write.Key] = write.Value; }
             }
@@ -281,10 +280,10 @@ namespace DADTKV_TM
         /// <summary>
         /// Removes Leases marked to be removed (of other Tm)
         /// </summary>
+        /// <param name="firstkey"></param>
         /// <param name="tm_name"></param>
-        /// <param name="epoch"></param>
         /// <returns></returns>
-        public bool LeaseRemove(string firstkey, string tm_name, int epoch)
+        public bool LeaseRemove(string firstkey, string tm_name)
         {
             FullLease fl;
             if(_leases[firstkey].TryPeek(out var lease)) fl = (FullLease)lease; // Gets FullLease
@@ -295,7 +294,7 @@ namespace DADTKV_TM
             {
                 if (_leases[key].TryPeek(out var result))
                 {
-                    if (result.Tm_name != tm_name || result.Epoch != epoch) return false; // Theoretically never possible
+                    if (result.Tm_name != tm_name) return false; // Theoretically never possible
                 }
                 else return false; // Theoretically never possible
             }
@@ -305,6 +304,20 @@ namespace DADTKV_TM
                 _leases[key].Dequeue(); // Removes queue entries
             }
             _fullLeases.Remove(fl); // Removes lease list entry
+            return true;
+        }
+        /// <summary>
+        /// Deletes all residual leases
+        /// </summary>
+        /// <param name="firstKeys"></param>
+        /// <param name="name"></param>
+        /// <returns></returns>
+        public bool DeleteResidual(List<string> firstKeys, string name)
+        {
+            foreach (string key in firstKeys)
+            {
+                LeaseRemove(key, name);
+            }
             return true;
         }
         //////////////////////////////////////////////USED BY LSERVICE////////////////////////////////////////////////////////////
@@ -322,7 +335,7 @@ namespace DADTKV_TM
             //eliminar leases residuais
             lock (this)
             {
-                DeleteResidualLeases(leases, epoch);
+                DeleteResidualLeases(leases, epoch, out int numberOfSameEpoch);
                 foreach (FullLease fl in leases)
                 {
                     foreach(string  key in fl.Keys)
@@ -346,25 +359,71 @@ namespace DADTKV_TM
                     }
                     _fullLeases.Add(fl);
                 }
+                RaiseEpochOfNewRequests(leases,epoch, numberOfSameEpoch);
                 _reqList.incrementEpoch();
             }
         }
-        private void DeleteResidualLeases(List<FullLease> newLeases, int epoch)
+
+        private void RaiseEpochOfNewRequests(List<FullLease> newLeases, int epoch, int numberOfSameEpoch)
         {
+            /* EX: We have to raise the epoch number of the requests that did not receive a lease in this epoch 
+             * EpochM: 0     0    0     0        1     1     1    1         1      1
+             *       <A,I> <A,B> <P> <A,B,K>  <A,B,C> <C,D> <X> <X,K>    <A,B,C> <C,D>
+             *          1º epoch             | 2º epoch               |  3º epoch 
+             */
+            int count = numberOfSameEpoch;
+            // Count all of our new leases
+            foreach (FullLease fullLease in newLeases)
+            {
+                if (fullLease.Tm_name == _name) count++;
+            }
+            // The requests saying Yes (from the new leases or old  leases) for this epoch are de sum of new leases for this Tm and numberOfSameEpoch
+            foreach (Request rq in _reqList.GetRequests())
+            {
+                /* EX: We have to raise the epoch number of the requests that did not receive a lease in this epoch 
+                * EpochM:    1     1     1    1         2      2
+                *         <A,B,C> <C,D> <X> <X,K>    <A,B,C> <C,D>
+                *            2º epoch               |  3º epoch 
+                */
+                if (rq.Situation == leaseRequested.Yes && rq.Epoch == epoch - 1)
+                {
+                    if (count != 0) count--;
+                    else
+                    {
+                        // when count is 0 we know that we do not have more leases for this epoch for new requests 
+                        // does not trouble leases that will be used for various requests, because the next request after the one that will use the lease right now 
+                        // will be marked as maybe, only after the one right now finishies, the follow request can turn into a Yes (if possible)
+                        rq.Epoch++;
+                    }
+                }
+                else if (rq.Situation != leaseRequested.Yes && rq.Epoch == epoch - 1) // All requests not marked with Yes will increase their epoch
+                {
+                    rq.Epoch++;
+                }
+            }
+
+
+        }
+
+
+        private void DeleteResidualLeases(List<FullLease> newLeases, int epoch, out int numberOfSameEpoch)
+        {
+            numberOfSameEpoch = 0;
             List<FullLease> residual = new List<FullLease>();
             foreach (FullLease fl in _fullLeases) { residual.Add(fl); }
 
             /* EX: We dont consider the new leases arriving
-             * EpochM: 0     0    0     0       1      1       1      1     
-             *       <A,I> <A,B> <P> <A,B,K>  <A,B,C> <C,D>  <A,B,C> <C,D>
-             *          1º epoch               2º epoch    3º epoch
-             *      A   10 11 13               15          17      
-             *      B   11 13                  15          17
-             *      K   13
-             *      I   10
-             *      P   12
-             *      C   14                     15   16     17   18
-             *      D   14                          16          18
+             * EpochM: 0     0    0     0        1     1     1    1         1      1
+             *       <A,I> <A,B> <P> <A,B,K>  <A,B,C> <C,D> <X> <X,K>    <A,B,C> <C,D>
+             *          1º epoch             | 2º epoch               |  3º epoch
+             *      A   10 11 13             | 16                     |     19      
+             *      B   11 13                | 16                     |     19
+             *      K   13                   |                   18   |
+             *      I   10                   |                        |
+             *      P   12                   |                        |
+             *      C   14                   | 16     17              |     19   20
+             *      D   14                   |        17              |          20
+             *      X   15                   |                   18   |
              */
 
 
@@ -380,8 +439,8 @@ namespace DADTKV_TM
             }
 
             /* We remove the leases from the queues that have END's
-            * EpochM: 0     0    0     0       1      1       1      1     
-            *       <A,I> <A,B> <P> <A,B,K>  <A,B,C> <C,D>  <A,B,C> <C,D>
+            * EpochM: 0     0    0     0        1      1    1    1       1      1
+            *       <A,I> <A,B> <P> <A,B,K>  <A,B,C> <C,D> <X> <X,K>  <A,B,C> <C,D>
             *          1º epoch
             *      A   
             *      B     
@@ -389,57 +448,101 @@ namespace DADTKV_TM
             *      I   
             *      P   12
             *      C   14      
-            *      D   14      
+            *      D   14  
+            *      X   15
             */
-
+            List<Request> epochRequest = null;
             foreach (FullLease fl in residual)
             {
                 foreach (Request rq in _reqList.GetRequests())
                 {
                     if (rq.Situation == leaseRequested.Yes)
                     {
-                        // We test each residual request, the requests that were from a previous epochs (<= epoch-2),
-                        if (epoch != 1 && rq.Epoch < epoch - 1 && fl.Epoch > rq.Epoch)
+                        // We test if the epoch number is smaller (<= epoch-2) than our new epoch number
+                        if (epoch != 1 && rq.Epoch < epoch-1)
                         {
-                            /* We remove the requests that are "new"
-                             * EpochM: 0     0    0     0   
-                             *       <A,I> <A,B> <P> <A,B,K>
+                            /* Only looks into the epoch-2 requests left
+                             * EpochM: 0     0    0     0    
+                             *       <A,I> <A,B> <P> <A,B,K> 
                              *          1º epoch
                              *      P   12
                              *      C   14      
-                             *      D   14      
+                             *      D   14
+                             *      X   15
                              */
                             // Is the only possible request to use that list, because we already removed all leases that had intersections with someone
                             if (rq.SubGroup(fl))
                             {
-                                /* From the remaining leases we remove the one that have a request using them
+                                /* From the remaining leases we remove the ones that have a request using them
                                  * EpochM: 0     0    0     0   
                                  *       <A,I> <A,B> <P> <A,B,K>
                                  *          1º epoch  
                                  *      C   14      
-                                 *      D   14      
-                                 * Tm1 lease 4 is residual
+                                 *      D   14  
+                                 *      X   15
                                  */
 
-                                // If someone will use it it's not residual then remove
+                                // If someone will use it it's not residual then remove (in this case the lease for P)
+                                
                                 residual.Remove(fl);
+                            }
+                        }
+                        else if (rq.Epoch == epoch - 1)
+                        {
+                            if(epochRequest == null) epochRequest = new List<Request>();
+                            epochRequest.Add(rq);
+                            /* Only looks into the epoch-1 requests left
+                             * EpochM:    1      1    1    1       1      1
+                             *         <A,B,C> <C,D> <X> <X,K>  <A,B,C> <C,D>
+                             *          1º epoch
+                             *      C   14      
+                             *      D   14  
+                             *      X   15
+                             */
+                            
+                            if (rq.SubGroup(fl))
+                            {
+                                bool intersect = false;
+                                foreach (Request rq2 in epochRequest)
+                                {
+                                    if (fl.Intersection(rq2)) intersect = true;
+                                }
+                                if (!intersect)
+                                {
+                                    residual.Remove(fl);
+                                    // Number of requests that have epochNumber -1 increases (used for calculating our epochs received)
+                                    numberOfSameEpoch++;
+                                }
+                                /* We remove any lease that will be used and does not have a intersection behind (from another epoch-1 request)
+                                 * EpochM:    1      1    1    1       1      1
+                                 *         <A,B,C> <C,D> <X> <X,K>  <A,B,C> <C,D>
+                                 *          1º epoch
+                                 *      C   14      
+                                 *      D   14  
+                                 *      
+                                 *      Lease from Tm1 lease 4 is residual and will be terminated with a broadcast
+                                 */
                             }
                         }
                     }
                 }
             }
-            
-
-            foreach (FullLease fl in residual)
+            // We will send the first key of every list to delete to all other Tm's, because they can get the full lease that way
+            List<string> firstKeys = new List<string>();
+            foreach (FullLease fl in residual) if (fl.Intersection(newLeases)) firstKeys.Add(fl.Keys[0]);
+            if(_tmContact.DeleteResidualKeys(firstKeys, _name)) // Theoredicaly never fails
             {
-                // This decreases the number of FullLeases that we have to test if it's residual
-                if (fl.Intersection(newLeases))
+                foreach (FullLease fl in residual)
                 {
-                    // Eliminates our Lease from all the _leases queues and the _fullLease list
-                    LeaseRemove(fl.Keys[0], _name, fl.Epoch);
-                    //mandar estas leases para os outros tm
+                    // This decreases the number of FullLeases that we have to test if it's residual
+                    if (fl.Intersection(newLeases))
+                    {
+                        // Eliminates our Lease from all the _leases queues and the _fullLease list
+                        LeaseRemove(fl.Keys[0], _name);
+                    }
                 }
             }
+            
         }
     }
 }

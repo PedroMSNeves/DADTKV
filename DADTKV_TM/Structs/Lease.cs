@@ -20,6 +20,14 @@
             }
             return false;
         }
+        public bool Intersection(Request other)
+        {
+            foreach (string key in Keys)
+            {
+                if (other.Keys.Contains(key)) return true;
+            }
+            return false;
+        }
         public bool Intersection(List<FullLease> others)
         {
             foreach(FullLease other in others)

@@ -23,10 +23,10 @@ namespace DADTKV_TM.Contact
                 }
             }
         }
-        public bool BroadCastChanges(List<DadIntProto> writes, string name, int epoch)
+        public bool BroadCastChanges(List<DadIntProto> writes, string name)
         {
             BroadReply reply;
-            BroadRequest request = new BroadRequest { TmName = name, Epoch = epoch };
+            BroadRequest request = new BroadRequest { TmName = name};
             List<DadIntTmProto> writesTm = new List<DadIntTmProto>();
             foreach (DadIntProto tm in writes) writesTm.Add(new DadIntTmProto { Key = tm.Key, Value = tm.Value });
             request.Writes.AddRange(writesTm);
@@ -39,6 +39,18 @@ namespace DADTKV_TM.Contact
                 // para isso possivelmente temos uma lista em cada Tm com nºtransacao, nome Tm
                 reply = stub.BroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
             }
+            return true;
+        }
+        public bool DeleteResidualKeys(List<string> residualKeys , string name) 
+        {
+            BroadReply reply;
+            ResidualDeletionRequest residualDeletionRequest = new ResidualDeletionRequest { TmName = name };
+            residualDeletionRequest.FirstKeys.AddRange(residualKeys);
+            foreach (BroadCastService.BroadCastServiceClient stub in tm_stubs)
+            {
+                reply = stub.ResidualDeletionAsync(residualDeletionRequest, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
+            }
+            // for now returns always true
             return true;
         }
     }

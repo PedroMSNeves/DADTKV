@@ -19,7 +19,15 @@ namespace DADTKV_TM.Impls
         }
         public BroadReply BCast(BroadRequest request)
         {
-            return new BroadReply { Ack = store.Write(request.Writes.ToList(), request.TmName, request.Epoch) };
+            return new BroadReply { Ack = store.Write(request.Writes.ToList(), request.TmName) };
+        }
+        public override Task<BroadReply> ResidualDeletion(ResidualDeletionRequest request, ServerCallContext context)
+        {
+            return Task.FromResult(RDeletion(request));
+        }
+        public BroadReply RDeletion(ResidualDeletionRequest request)
+        {
+            return new BroadReply { Ack = store.DeleteResidual(request.FirstKeys.ToList(), request.TmName) } ;
         }
     }
 }
