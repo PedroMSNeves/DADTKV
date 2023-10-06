@@ -12,6 +12,7 @@ namespace DADTKV_TM.Structs
         private int MAX;
         private int buzy = 0;
         private int transaction_number = 0;
+        private int _epoch = 0; // Last epoch received
         public RequestList(int size)
         {
             result = new Dictionary<int, ResultOfTransaction>();
@@ -27,7 +28,7 @@ namespace DADTKV_TM.Structs
                 buff = buffer;
             }
             return buff; 
-        }   
+        }
         public int insert(List<string> reads, List<DadIntProto> writes)
         {
             int tnumber;
@@ -35,7 +36,7 @@ namespace DADTKV_TM.Structs
             {
                 while (buzy == MAX) Monitor.Wait(this);
                 tnumber = transaction_number++;
-                buffer.Add(new Request(reads, writes, tnumber));
+                buffer.Add(new Request(reads, writes, tnumber, _epoch));
                 buzy++;
                 Monitor.PulseAll(this);
             }
@@ -69,5 +70,6 @@ namespace DADTKV_TM.Structs
             }
             return resultT;
         }
+        public void incrementEpoch() { _epoch++; }
     }
 }

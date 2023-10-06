@@ -12,6 +12,24 @@
 
         public List<string> Keys { get; }
 
+        public bool Intersection(FullLease other)
+        {
+            foreach (string key in Keys) 
+            {
+                if (other.Contains(key)) return true;
+            }
+            return false;
+        }
+        public bool Intersection(List<FullLease> others)
+        {
+            foreach(FullLease other in others)
+            {
+                if (Intersection(other)) return true;
+            }
+            return false;
+        }
+        public bool Contains(string key)
+        { return Keys.Contains(key); }
         public override string ToString() => $"({Tm_name}, {Epoch}, {End})";
     }
 

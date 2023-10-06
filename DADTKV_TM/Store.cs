@@ -183,12 +183,11 @@ namespace DADTKV_TM
             {
                 // If we arrive at a request marked with Maybe/No 
                 if (reqs[i].Situation != leaseRequested.Yes) break;
-                else // request marked with Yes
+                else // Request marked with Yes
                 {
-                    //veri se executavel
-                    //veri se somos um subgrupo de uma lease completa (1º lugar em todas as keys dela) e se funcionamos com essa lease
-                    // basta ver a primeira key para saber a lease que ira usar (porque so fica marcado com S se ja puder ser executado ou estiver à espera da sua lease
                     FullLease fl;
+                    /* We can use first key to get the lease from a queue,
+                       because you can only be marked with Yes if you have a lease waiting for you or you have requested a lease */
                     if (_leases[reqs[i].Keys[0]].TryPeek(out var lease) && lease.Tm_name == _name)
                     {
                         fl = (FullLease)lease;
@@ -209,7 +208,7 @@ namespace DADTKV_TM
                                      * When t3 tries to execute the lease for the T1 as already been removed
                                      */
                                     diff = true;
-                                    break; ; // Some other Transaction is waiting for some other Tm to release is key
+                                    break; // Some other Transaction is waiting for some other Tm to release is key
                                 }
                             }
                             else
@@ -223,20 +222,6 @@ namespace DADTKV_TM
                     else continue;/* If the lease is not of our Tm or the queue is empty:
                                    * The new set of leases did not arrive yet
                                    * Or is waiting for another Tm to end is lease */
-
-
-                    // possivelmente verificar tambem intersessoes com outros requests marcados a S antes dele
-                    // mas acho que nao é nesse visto que:
-                    /*    S      
-                     * <A,B,C> <C,D>
-                     *     1º epoch         2º epoch
-                     * A                    12
-                     * B                    12
-                     * C  11                12   13
-                     * D  11                     13
-                     * Depende de como marcamos no verify
-                     */
-
 
                     // Remove from the request list
                     _reqList.remove(i);
@@ -287,7 +272,7 @@ namespace DADTKV_TM
             {
                 if (tm_name != null && writes.Count != 0)
                 {
-                    if (!LeaseRemove(writes[0].Key, tm_name, epoch)) return false;
+                    if (!LeaseRemove(writes[0].Key, tm_name, epoch)) return false; // Always goes well because they are all correct servers
                 }
                 foreach (DadIntTmProto write in writes) { _store[write.Key] = write.Value; }
             }
@@ -301,9 +286,6 @@ namespace DADTKV_TM
         /// <returns></returns>
         public bool LeaseRemove(string firstkey, string tm_name, int epoch)
         {
-            //basta 1 key para descobrir a full lease? testar se funciona
-            //no maximo verificar se fl funciona para os writes pedidos (acho que nao ness)
-
             FullLease fl;
             if(_leases[firstkey].TryPeek(out var lease)) fl = (FullLease)lease; // Gets FullLease
             else return false; // Theoretically never possible
@@ -313,16 +295,16 @@ namespace DADTKV_TM
             {
                 if (_leases[key].TryPeek(out var result))
                 {
-                    if (result.Tm_name != tm_name) return false; // supostamente nunca possivel
+                    if (result.Tm_name != tm_name || result.Epoch != epoch) return false; // Theoretically never possible
                 }
-                else return false; // supostamente nunca possivel
+                else return false; // Theoretically never possible
             }
             // Remove all entries
             foreach (string key in fl.Keys)
             {
-                _leases[key].Dequeue(); // para remover das queue
+                _leases[key].Dequeue(); // Removes queue entries
             }
-            _fullLeases.Remove(fl); // para remover tambem da lista
+            _fullLeases.Remove(fl); // Removes lease list entry
             return true;
         }
         //////////////////////////////////////////////USED BY LSERVICE////////////////////////////////////////////////////////////
@@ -336,8 +318,11 @@ namespace DADTKV_TM
         public void NewLeases(List<FullLease> leases, int epoch)
         {
             // mensagem especial para eliminar os restos
+
+            //eliminar leases residuais
             lock (this)
-            { 
+            {
+                DeleteResidualLeases(leases, epoch);
                 foreach (FullLease fl in leases)
                 {
                     foreach(string  key in fl.Keys)
@@ -360,6 +345,99 @@ namespace DADTKV_TM
                         _leases[key].Enqueue(fl); // DownCast
                     }
                     _fullLeases.Add(fl);
+                }
+                _reqList.incrementEpoch();
+            }
+        }
+        private void DeleteResidualLeases(List<FullLease> newLeases, int epoch)
+        {
+            List<FullLease> residual = new List<FullLease>();
+            foreach (FullLease fl in _fullLeases) { residual.Add(fl); }
+
+            /* EX: We dont consider the new leases arriving
+             * EpochM: 0     0    0     0       1      1       1      1     
+             *       <A,I> <A,B> <P> <A,B,K>  <A,B,C> <C,D>  <A,B,C> <C,D>
+             *          1º epoch               2º epoch    3º epoch
+             *      A   10 11 13               15          17      
+             *      B   11 13                  15          17
+             *      K   13
+             *      I   10
+             *      P   12
+             *      C   14                     15   16     17   18
+             *      D   14                          16          18
+             */
+
+
+            // Removes all leases from residual list in queues marked to end, because if they have a lease to end before they execute, they didnt execute yet
+            foreach (string key in _leases.Keys) 
+            {
+                bool end = false;
+                foreach(Lease l in _leases[key]) 
+                {
+                    if (l.End) end = true;
+                    if (end) residual.Remove((FullLease)l);
+                }
+            }
+
+            /* We remove the leases from the queues that have END's
+            * EpochM: 0     0    0     0       1      1       1      1     
+            *       <A,I> <A,B> <P> <A,B,K>  <A,B,C> <C,D>  <A,B,C> <C,D>
+            *          1º epoch
+            *      A   
+            *      B     
+            *      K   
+            *      I   
+            *      P   12
+            *      C   14      
+            *      D   14      
+            */
+
+            foreach (FullLease fl in residual)
+            {
+                foreach (Request rq in _reqList.GetRequests())
+                {
+                    if (rq.Situation == leaseRequested.Yes)
+                    {
+                        // We test each residual request, the requests that were from a previous epochs (<= epoch-2),
+                        if (epoch != 1 && rq.Epoch < epoch - 1 && fl.Epoch > rq.Epoch)
+                        {
+                            /* We remove the requests that are "new"
+                             * EpochM: 0     0    0     0   
+                             *       <A,I> <A,B> <P> <A,B,K>
+                             *          1º epoch
+                             *      P   12
+                             *      C   14      
+                             *      D   14      
+                             */
+                            // Is the only possible request to use that list, because we already removed all leases that had intersections with someone
+                            if (rq.SubGroup(fl))
+                            {
+                                /* From the remaining leases we remove the one that have a request using them
+                                 * EpochM: 0     0    0     0   
+                                 *       <A,I> <A,B> <P> <A,B,K>
+                                 *          1º epoch  
+                                 *      C   14      
+                                 *      D   14      
+                                 * Tm1 lease 4 is residual
+                                 */
+
+                                // If someone will use it it's not residual then remove
+                                residual.Remove(fl);
+                            }
+                        }
+                    }
+                }
+            }
+            
+
+            foreach (FullLease fl in residual)
+            {
+                // This decreases the number of FullLeases that we have to test if it's residual
+                if (fl.Intersection(newLeases))
+                {
+                    // Eliminates our Lease from all the _leases queues and the _fullLease list
+                    LeaseRemove(fl.Keys[0], _name, fl.Epoch);
+                    //mandar estas leases para os outros tm
                 }
             }
         }

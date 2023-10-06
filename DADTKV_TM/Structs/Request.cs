@@ -14,13 +14,14 @@
     /// </summary>
     public class Request
     {
-        public Request(List<string> reads, List<DadIntProto> writes, int transaction_number)
+        public Request(List<string> reads, List<DadIntProto> writes, int transaction_number, int epoch)
         {
             Reads = reads;
             Writes = writes;
             Transaction_number = transaction_number;
             Situation = leaseRequested.No;
             Keys = GetKeys();
+            Epoch = epoch;
         }
         public leaseRequested Situation { set; get; }
         public List<string> Reads { get; }
@@ -28,6 +29,7 @@
         public int Transaction_number { set; get; }
 
         public List<string> Keys { get; }
+        public int Epoch { set; get; }
 
         private List<string> GetKeys()
         {
