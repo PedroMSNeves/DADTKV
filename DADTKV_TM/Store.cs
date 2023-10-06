@@ -1,6 +1,5 @@
 ﻿using DADTKV_TM.Contact;
 using DADTKV_TM.Structs;
-using System.Diagnostics.Contracts;
 
 namespace DADTKV_TM
 {
@@ -182,29 +181,79 @@ namespace DADTKV_TM
             int i = 0;
             while (true)
             {
-                if (reqs[i].Situation != leaseRequested.Yes)
-                {
-                    break;
-                }
-                else if (reqs[i].Situation == leaseRequested.Yes)
+                // If we arrive at a request marked with Maybe/No 
+                if (reqs[i].Situation != leaseRequested.Yes) break;
+                else // request marked with Yes
                 {
                     //veri se executavel
                     //veri se somos um subgrupo de uma lease completa (1º lugar em todas as keys dela) e se funcionamos com essa lease
-                   
-                    //maybe guardar as leases 
+                    // basta ver a primeira key para saber a lease que ira usar (porque so fica marcado com S se ja puder ser executado ou estiver à espera da sua lease
+                    FullLease fl;
+                    if (_leases[reqs[i].Keys[0]].TryPeek(out var lease) && lease.Tm_name == _name)
+                    {
+                        fl = (FullLease)lease;
+                        if (!reqs[i].SubGroup(fl)) continue; /* If he is not a subGroup of the lease then:
+                                                              * He is still waiting for is lease to arive and this is an old lease
+                                                              * Or some other Transaction is waiting for some other Tm to release is key */
+                        bool diff = false;
+                        foreach (string key in fl.Keys)
+                        {
+                            if (_leases[key].TryPeek(out var result))
+                            {
+                                if (fl != (FullLease)result) // Even if 2 leases are equal will not be a problem, because the firt T that uses it will remove the first equal lease, exemple below
+                                {                             
+                                    /* EX: t1<a,b> t2<b,c> t3<a,b>
+                                     * A  11 13
+                                     * B  11 12 13
+                                     * C  12
+                                     * When t3 tries to execute the lease for the T1 as already been removed
+                                     */
+                                    diff = true;
+                                    break; ; // Some other Transaction is waiting for some other Tm to release is key
+                                }
+                            }
+                            else
+                            {
+                                diff = true;
+                                break; // If the Queue is empty then the new leases did not arive yet
+                            }
+                        }
+                        if (diff) continue;
+                    }
+                    else continue;/* If the lease is not of our Tm or the queue is empty:
+                                   * The new set of leases did not arrive yet
+                                   * Or is waiting for another Tm to end is lease */
+
+
+                    // possivelmente verificar tambem intersessoes com outros requests marcados a S antes dele
+                    // mas acho que nao é nesse visto que:
+                    /*    S      
+                     * <A,B,C> <C,D>
+                     *     1º epoch         2º epoch
+                     * A                    12
+                     * B                    12
+                     * C  11                12   13
+                     * D  11                     13
+                     * Depende de como marcamos no verify
+                     */
+
+
+                    // Remove from the request list
                     _reqList.remove(i);
                     List<DadIntProto> reply = new List<DadIntProto>();
-                    int err = Request(reqs[i].Reads, reqs[i].Writes, ref reply, _tmContact);
-                    if (err == -2)
-                    {
-                        //try again, only one time
-                        err = Request(reqs[i].Reads, reqs[i].Writes, ref reply, _tmContact);
-                    }
-                    _reqList.move(0, reply, err);
+
+                    // Tries to propagate
+                    int err = Request(reqs[i].Reads, reqs[i].Writes, ref reply, fl.Epoch);
+
+                    // Try again, only one time
+                    if (err == -2) err = Request(reqs[i].Reads, reqs[i].Writes, ref reply, fl.Epoch);
+
+                    // Moves it to the pickup waiting place
+                    _reqList.move(reqs[i].Transaction_number, reply, err);
 
                 }
-                i++;
-                
+                i++;  
+                if (i >= reqs.Count)  break;
             }
            
         }
@@ -216,11 +265,11 @@ namespace DADTKV_TM
         /// <param name="reply"></param>
         /// <param name="tmContact"></param>
         /// <returns></returns>
-        public int Request(List<string> reads, List<DadIntProto> writes, ref List<DadIntProto> reply, TmContact tmContact)
-        { //esta a receber sempre 0 epoch depois mudar
-            if (!tmContact.BroadCastChanges(writes,_name,0)) return -2; // depois tem de mandar info sobre fechar lease again
-            foreach (string key in reads) reply.Add(new DadIntProto { Key = key, Value = _store[key] });
-            foreach (DadIntProto write in writes) _store[write.Key] = write.Value; //testar se cria a key mesmo se nao tiver la 
+        public int Request(List<string> reads, List<DadIntProto> writes, ref List<DadIntProto> reply, int epoch)
+        {
+            if (!_tmContact.BroadCastChanges(writes,_name,epoch)) return -2;
+            foreach (string key in reads) reply.Add(new DadIntProto { Key = key, Value = _store[key] }); // Does the reads
+            foreach (DadIntProto write in writes) _store[write.Key] = write.Value; // Does the writes
             return 0;
         }
         //////////////////////////////////////////////USED BY BROADSERVICE////////////////////////////////////////////////////////////
@@ -256,28 +305,24 @@ namespace DADTKV_TM
             //no maximo verificar se fl funciona para os writes pedidos (acho que nao ness)
 
             FullLease fl;
-            if(_leases[firstkey].TryPeek(out var lease))
-            {
-                fl = (FullLease)lease;
-            }
-            else
-            {
-                return false;
-            }
+            if(_leases[firstkey].TryPeek(out var lease)) fl = (FullLease)lease; // Gets FullLease
+            else return false; // Theoretically never possible
+
             // Verify all entries
             foreach (string key in fl.Keys)
             {
                 if (_leases[key].TryPeek(out var result))
                 {
-                    if (result.Tm_name != tm_name) return false;
+                    if (result.Tm_name != tm_name) return false; // supostamente nunca possivel
                 }
-                else return false;
+                else return false; // supostamente nunca possivel
             }
             // Remove all entries
             foreach (string key in fl.Keys)
             {
-                _leases[key].Dequeue();
+                _leases[key].Dequeue(); // para remover das queue
             }
+            _fullLeases.Remove(fl); // para remover tambem da lista
             return true;
         }
         //////////////////////////////////////////////USED BY LSERVICE////////////////////////////////////////////////////////////

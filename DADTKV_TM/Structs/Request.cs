@@ -50,5 +50,13 @@
             }
             return true;
         }
+        public bool SubGroup(FullLease other)
+        {
+            foreach (string key in Keys)
+            {
+                if (!other.Keys.Contains(key)) return false;
+            }
+            return true;
+        }
     }
 }
