@@ -36,3 +36,5 @@ We implemented:
 We couldn't test the project yet with real running tests, for time reasons, 
 but we tested with a lot of Tests (some of them are in comments in the code to help visualize the problem) 
 created by us to try and break our solution
+
+There is a bug in the VS that sometimes when you download the solution from the github it stays stuck compiling, please restart the VS if that happens
