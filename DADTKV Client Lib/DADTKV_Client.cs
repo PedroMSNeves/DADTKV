@@ -25,11 +25,11 @@ namespace DADTKV_Client_Lib
             {
                 channels.Add(GrpcChannel.ForAddress(url));
             }
-            catch (System.UriFormatException ex)
+            catch (System.UriFormatException)
             {
                 Console.WriteLine("ERROR: Invalid url");
             }
-            
+
         }
         /// <summary>
         /// Receives the client name, read list and write list for a transaction
@@ -39,18 +39,18 @@ namespace DADTKV_Client_Lib
         /// <param name="read"></param>
         /// <param name="write"></param>
         /// <returns></returns>
-        public List<DadInt> TxSubmit(string cname, List<string> read,List<DadInt> write)
+        public List<DadInt> TxSubmit(string cname, List<string> read, List<DadInt> write)
         {
             TxReply reply;
             List<DadInt> result = new List<DadInt>();
             TxRequest request = new TxRequest { Id = cname };
             request.Reads.AddRange(read);
-            foreach (DadInt d in write) { request.Writes.Add(new DadIntProto { Key = d.Key , Value = d.Val }); }
+            foreach (DadInt d in write) { request.Writes.Add(new DadIntProto { Key = d.Key, Value = d.Val }); }
 
-            if(tm == null)
+            if (tm == null)
             {
                 // We calculate the server, to use, this way, to have a "good" distribuition of the clients to the servers
-                foreach (char c in cname) tm_cursor += (int) c; // calculate value of name
+                foreach (char c in cname) tm_cursor += (int)c; // calculate value of name
                 tm_cursor = tm_cursor % channels.Count(); // chooses one of the servers
                 tm = new TmService.TmServiceClient(channels[tm_cursor]);
             }
@@ -61,11 +61,11 @@ namespace DADTKV_Client_Lib
             catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded || ex.StatusCode == StatusCode.Unavailable)
             {
                 Console.WriteLine("ERROR: Couldn't contact Server, please try again");
-                tm_cursor= ++tm_cursor % channels.Count();
+                tm_cursor = ++tm_cursor % channels.Count();
                 tm = new TmService.TmServiceClient(channels[tm_cursor]); // Changes the server to contact in the next request
                 return new List<DadInt>();
             }
-            foreach ( DadIntProto dad in reply.Reads) { result.Add(new DadInt(dad.Key, dad.Value)); }
+            foreach (DadIntProto dad in reply.Reads) { result.Add(new DadInt(dad.Key, dad.Value)); }
             Console.WriteLine("Transaction succeded!");
             return result;
         }
