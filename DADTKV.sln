@@ -13,7 +13,12 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DADTKV_TM", "DADTKV_TM\DADT
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DADTKV_LM", "DADTKV_LM\DADTKV_LM.csproj", "{516A8787-5BDB-4D48-A992-03964F088C1D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConfigParser", "ConfigParser\ConfigParser.csproj", "{22F1C432-5AE8-4039-8216-BADC8D48B0A2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConfigParser", "ConfigParser\ConfigParser.csproj", "{22F1C432-5AE8-4039-8216-BADC8D48B0A2}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Itens de Solução", "Itens de Solução", "{D40A545C-44A5-4DC9-956E-DFF1ED50A7C1}"
+	ProjectSection(SolutionItems) = preProject
+		Implementation.txt = Implementation.txt
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

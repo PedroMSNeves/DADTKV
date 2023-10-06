@@ -1,0 +1,38 @@
+We implemented:
+-In the client (Pedro):
+	-The parse of the arguments	
+	-The Library that contacts the Tm
+		-Transactions 
+		-Wait
+		(we have the status function but it does not do anything  yet)
+	
+
+-In the Tm (Pedro and Beatriz):
+	-The parse of the arguments
+	- Receiving requests from various clients concurrently and treating them one by one (can be "out of order" if they not intersect)
+		- Requests are marked with Yes,Maybe,No
+			- Yes, they can be executed right now or are waiting for their requested lease
+			- Maybe, they are waiting for someone to end to see if they can use it's lease 
+				(right now we cant have a Maybe then a Yes, but we can optimize the code to have Maybe then a Yes if the second one does not intersect the first)
+			- No, they have not been verified yet or they are with No behind a Maybe 
+				(optimization of this possible, with the one above)
+	- Receiving leases from lm
+		- Eliminating residual leases that could block the new leases (and broadcast that removal of leases)
+			(residual lease is a lease that will not be used again but it would not be removed by normal means)
+			(normal means for us is by being removed after ending a transaction and the lease was marked to end)
+			(a lease marked to end is a lease that intersects any other lease after itself)
+	- Receiving propagation broadcasts from other tms
+	(not yet implemented suspections or crashes)
+
+-In the Lm (Beatriz and Pedro):
+	-The parse of the arguments
+	- We implemented paxos 
+		(without the timeslot, a new epoch is started after the one before ended)
+	(not yet implemented multi-paxos)
+
+-In the parser to start all of the nodes (Clients,Tms and Lms) (Carlos):
+	-We implemented all of it
+
+We couldn't test the project yet with real running tests, for time reasons, 
+but we tested with a lot of Tests (some of them are in comments in the code to help visualize the problem) 
+created by us to try and break our solution
