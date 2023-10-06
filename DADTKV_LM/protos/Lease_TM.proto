@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+message LeaseProto {
+	string tm = 1;
+	repeated string keys = 2;
+	//int32 lease_request_id = 3; 
+}
+message LeaseRequest {
+	string id = 1;
+	repeated string keys = 2;
+	//int32 lease_request_id = 3; not needed at least for now
+}
+
+message LeaseReply {
+	bool ack = 1;
+}
+message LeaseBroadCastRequest {
+	int32 epoch = 1;
+	repeated LeaseProto leases = 2;
+}
+
+service LeaseService {
+	rpc Lease (LeaseRequest) returns (LeaseReply);
+	rpc LeaseBroadCast (LeaseBroadCastRequest) returns (LeaseReply);
+}
