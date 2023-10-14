@@ -7,12 +7,13 @@ namespace ConfigParser
         public static Process createProcess(string project, string arguments)
         {
             Process process = new Process();
-            process.StartInfo.FileName = "dotnet";
-            process.StartInfo.Arguments = $"run --project {project} {arguments}";
-            process.StartInfo.UseShellExecute = false;
-            process.StartInfo.RedirectStandardInput = true;
+            process.StartInfo.FileName = "cmd.exe";
+            process.StartInfo.Arguments = $"/c dotnet run --project {project} {arguments}";
+            process.StartInfo.UseShellExecute = true;
+            process.StartInfo.CreateNoWindow = false;
             return process;
         }
+
         public static void launchClient(string id, string clientScript, List<string> transactionManagers)
         {
             // Pass all Transaction Manager URLs to the client
