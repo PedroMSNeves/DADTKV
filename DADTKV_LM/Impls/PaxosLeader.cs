@@ -78,32 +78,13 @@ namespace DADTKV_LM.Impls
         public bool PrepareRequest()
         {
             PrepareRequest request = new PrepareRequest { RoundId = _data.IncrementRoundID() };
-            Promise reply;
-            int promises = 0;
-            foreach (PaxosService.PaxosServiceClient stub in _lmcontact.lm_stubs)
-            {
-                reply = stub.PrepareAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
-                if (reply.Ack) promises++;
-
-                Other_TS = _data.Write_TS;
-                if (reply.WriteTs > Other_TS)
-                {
-                    foreach (LeasePaxos l in reply.Leases)
-                    {
-                        Others_value.Add(new Request(l.Tm, l.Keys.ToList()));
-                    }
-                    Other_TS = reply.WriteTs;
-                }
-            }
-            return promises > (_lmcontact.lm_stubs.Count + 1) / 2; //true se for maioria, removemos da lista se morrerem?
+            return _lmcontact.PrepareRequest(request, _data.Write_TS, Other_TS, Others_value);
         }
 
         public bool AcceptRequest()
         {
-            AcceptReply reply;
             AcceptRequest request = new AcceptRequest { WriteTs = _data.RoundID };
             LeasePaxos lp;
-            int acks = 0;
             //comparar os TS e ver qual vamos aceitar
             if (Other_TS > _data.Write_TS)
             {
@@ -124,12 +105,8 @@ namespace DADTKV_LM.Impls
                 }
             }
             request.LeaderId = Id;
-            foreach (PaxosService.PaxosServiceClient stub in _lmcontact.lm_stubs)
-            {
-                reply = stub.AcceptAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
-                if (reply.Ack) acks++;
-            }
-            return acks > (_lmcontact.lm_stubs.Count + 1) / 2; //em vez do count vai ser com o bitmap dos lms que estao vivos
+            return _lmcontact.AcceptRequest(request);
+           
         }
     }
 }
