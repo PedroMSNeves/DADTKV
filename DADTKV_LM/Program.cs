@@ -24,9 +24,9 @@ namespace DADTKV_LM
                 else if (!tm) lm_urls.Add(args[i]);
                 else tm_urls.Add(args[i]);
             }
-            if (tm)
+            if (!tm)
             {
-                Console.WriteLine("ERROR: Invalid number of args. No TransactinoalManagers provided");
+                Console.WriteLine("ERROR: LM Invalid number of args. No TransactinoalManagers provided");
                 Console.WriteLine("Press any key to close");
                 Console.ReadKey();
                 Environment.Exit(0);

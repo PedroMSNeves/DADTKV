@@ -18,9 +18,8 @@
         /// Tries to parse the string to have a string with no "normal" spaces (does not eliminate the spaces in names)
         /// </summary>
         /// <returns></returns>
-        public static string ParseStringNoSpaces()
+        public static string ParseStringNoSpaces(string newline)
         {
-            string newline = Console.ReadLine();
             string reduced = "";
             if (newline == null) { return ""; }
             int i = 0;

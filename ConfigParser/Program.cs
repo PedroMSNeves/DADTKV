@@ -146,17 +146,19 @@ namespace ConfigParser
                 }
             }
 
-            // Launch all servers
-            foreach (KeyValuePair<string, string> transactionManager in transactionManagers)
-            {
-                launchTransactionManager(transactionManager.Key, transactionManager.Value, transactionManagers.Values.ToList(), leaseManagers.Values.ToList());
-            }
 
             int paxos_id = 0;
             foreach (KeyValuePair<string, string> leaseManager in leaseManagers)
             {
                 launchLeaseManager(leaseManager.Key, paxos_id++, leaseManager.Value, transactionManagers.Values.ToList(), leaseManagers.Values.ToList());
             }
+            // Launch all servers
+            foreach (KeyValuePair<string, string> transactionManager in transactionManagers)
+            {
+                launchTransactionManager(transactionManager.Key, transactionManager.Value, transactionManagers.Values.ToList(), leaseManagers.Values.ToList());
+            }
+
+
 
             // Launch all clients
             foreach (KeyValuePair<string, string> client in clients)

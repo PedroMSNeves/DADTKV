@@ -21,14 +21,15 @@
 
         public static void Main(string[] args)
         {
-            ClientLogic clientLogic = argsPrep(args);
+                ClientLogic clientLogic = argsPrep(args);
 
             string[] lines = System.IO.File.ReadAllLines(args[0]);
             foreach (string line in lines)
             {
                 string[] words = line.Split(' ');
+                if (words.Length == 0) break; //cheganis ai fim
                 if (words[0].Length != 1) exitOnError("Invalid command");
-
+                
                 char c = words[0][0];
                 switch (c)
                 {
@@ -45,7 +46,8 @@
                         Dictionary<string, int> writes = new Dictionary<string, int>();
 
                         int i = 0;
-                        string restOfLine = line.Substring(2); ;
+                        string restOfLine = line.Substring(2);
+                        restOfLine = Parse_Lib.Parse.ParseStringNoSpaces(restOfLine);
                         if (!Parse_Lib.Parse.ParseReads(restOfLine, ref i, out reads)) exitOnError("Bad read transaction format");
                         if (!Parse_Lib.Parse.ParseWrites(restOfLine, ref i, out writes)) exitOnError("Bad write transaction format");
                         clientLogic.Transaction(reads, writes);
@@ -59,6 +61,9 @@
                         continue;
                 }
             }
+            Console.WriteLine("Client ended");
+            Console.WriteLine("Press any key to close.");
+            Console.ReadKey();
         }
     }
 }

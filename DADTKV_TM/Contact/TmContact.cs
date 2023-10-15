@@ -9,13 +9,15 @@ namespace DADTKV_TM.Contact
     public class TmContact
     {
         List<BroadCastService.BroadCastServiceClient> tm_stubs = new List<BroadCastService.BroadCastServiceClient>();
+        List<GrpcChannel> tm_channels = new List<GrpcChannel>();
+
         public TmContact(List<string> tm_urls)
         {
             foreach (string url in tm_urls)
             {
                 try
                 {
-                    tm_stubs.Add(new BroadCastService.BroadCastServiceClient(GrpcChannel.ForAddress(url)));
+                    tm_channels.Add(GrpcChannel.ForAddress(url));
                 }
                 catch (System.UriFormatException)
                 {
@@ -30,6 +32,15 @@ namespace DADTKV_TM.Contact
             List<DadIntTmProto> writesTm = new List<DadIntTmProto>();
             foreach (DadIntProto tm in writes) writesTm.Add(new DadIntTmProto { Key = tm.Key, Value = tm.Value });
             request.Writes.AddRange(writesTm);
+
+            if (tm_stubs == null)
+            {
+                tm_stubs = new List<BroadCastService.BroadCastServiceClient>();
+                foreach (GrpcChannel channel in tm_channels)
+                {
+                    tm_stubs.Add(new BroadCastService.BroadCastServiceClient(channel));
+                }
+            }
 
             foreach (BroadCastService.BroadCastServiceClient stub in tm_stubs)
             {

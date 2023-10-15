@@ -80,9 +80,12 @@ namespace DADTKV_TM
                   
                 for (int i = 0; i< reqs.Count; i++)
                 {
+
                     if (reqs[i].Situation == leaseRequested.Yes) { continue; }
                     else if(reqs[i].Situation == leaseRequested.No)
                     {
+                        Console.WriteLine(reqs[0].Situation);
+
                         /*
                          * Verificar se temos a lease atualmente
                          * Verificar se é um subgrupo de um request marcado a S
@@ -113,7 +116,11 @@ namespace DADTKV_TM
                                     }
                                 }
                             }
-                        }                       
+                        }
+                        else completed = false;
+
+                        Console.WriteLine(reqs[0].Situation);
+
                         if (completed)
                         {
                             if (!maybeOnly)
@@ -132,8 +139,9 @@ namespace DADTKV_TM
                                 continue;
                             }
                         }
+                        Console.WriteLine(reqs[0].Situation);
 
-                            
+
 
                         // vai ter subreposicao com parte da veri de cima, mas tem casos diff, os que ainda nao temos a lease, mas ja pedimos
                         for (int j = 0; j < i; j++)
@@ -157,8 +165,11 @@ namespace DADTKV_TM
                         // right now we cant have Maybe true, only maybe maybe or maybe no
                         if (!maybeOnly && reqs[i].Situation == leaseRequested.No)
                         {
+                            Console.WriteLine(reqs[0].Situation);
                             _lmcontact.RequestLease(reqs[i].Keys);
                             reqs[i].Situation = leaseRequested.Yes;
+                            Console.WriteLine(reqs[0].Situation);
+
                         }
                     }
                     else // é o maybe
@@ -231,6 +242,7 @@ namespace DADTKV_TM
                         }
                     }
                 }
+                Console.WriteLine(reqs[0].Situation);
                 Execute(ref reqs);
             }
             

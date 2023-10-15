@@ -7,9 +7,11 @@ namespace DADTKV_LM.Contact
     public class TmContact
     {
         List<LeaseService.LeaseServiceClient> tm_stubs = new List<LeaseService.LeaseServiceClient>();
+        List<GrpcChannel> tm_channels = new List<GrpcChannel>();
+
         public TmContact(List<string> tm_urls)
         {
-            foreach (string url in tm_urls) tm_stubs.Add(new LeaseService.LeaseServiceClient(GrpcChannel.ForAddress(url)));
+            foreach (string url in tm_urls) tm_channels.Add(GrpcChannel.ForAddress(url));
         }
         public void BroadLease(int epoch, List<Request> leases)
         {
@@ -21,6 +23,15 @@ namespace DADTKV_LM.Contact
                 LeaseProto lp = new LeaseProto { Tm = r.Tm_name };
                 foreach (string k in r.Keys) { lp.Keys.Add(k); }
                 request.Leases.Add(lp);
+            }
+
+            if (tm_stubs == null)
+            {
+                tm_stubs = new List<LeaseService.LeaseServiceClient>();
+                foreach (GrpcChannel channel in tm_channels)
+                {
+                    tm_stubs.Add(new LeaseService.LeaseServiceClient(channel));
+                }
             }
 
             foreach (LeaseService.LeaseServiceClient stub in tm_stubs)

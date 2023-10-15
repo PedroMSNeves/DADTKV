@@ -7,16 +7,28 @@ namespace DADTKV_LM.Contact
     {
         private string _name;
         public List<PaxosService.PaxosServiceClient> lm_stubs = new List<PaxosService.PaxosServiceClient>();
+        List<GrpcChannel> lm_channels = new List<GrpcChannel>();
+
         public LmContact(string name, List<string> lm_urls)
         {
             _name = name;
-            foreach (string url in lm_urls) lm_stubs.Add(new PaxosService.PaxosServiceClient(GrpcChannel.ForAddress(url)));
+            foreach (string url in lm_urls) lm_channels.Add(GrpcChannel.ForAddress(url));
         }
         public bool BroadAccepted(AcceptRequest request)
         {
             List<int> values = new List<int>();
             values.Add(0);//ack counter
             values.Add(0);//nack counter
+
+
+            if (lm_stubs == null)
+            {
+                lm_stubs = new List<PaxosService.PaxosServiceClient>();
+                foreach (GrpcChannel channel in lm_channels)
+                {
+                    lm_stubs.Add(new PaxosService.PaxosServiceClient(channel));
+                }
+            }
             foreach (PaxosService.PaxosServiceClient stub in lm_stubs)
             {
                 Thread t = new Thread(() => { sendAccepted(ref values, stub, request); });
