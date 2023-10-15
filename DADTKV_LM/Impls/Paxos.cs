@@ -112,5 +112,21 @@ namespace DADTKV_LM.Impls
             reply.Ack = true;
             return reply;
         }
+        public override Task<AcceptReply> GetLeaderAck(AckRequest request, ServerCallContext context)
+        {
+            return Task.FromResult(LeaderAck());
+        }
+        public AcceptReply LeaderAck() //returns promise if roundId >  my readTS
+        {
+            AcceptReply reply = new AcceptReply();
+
+            lock (_data)
+            {
+                if (_data.IsLeader ) reply.Ack = true;
+                else reply.Ack = false;
+            }
+            return reply;
+        }
+
     }
 }

@@ -65,7 +65,7 @@ namespace DADTKV_LM.Contact
                 Thread t = new Thread(() => { sendAccepted(ref values, stub, request); });
                 t.Start();
             }
-            lock (values)
+            lock (this)
             {
                 while (!(values[0] + 1 >= (lm_stubs.Count + 1) / 2 || values[1] >= (lm_stubs.Count + 1) / 2)) Monitor.Wait(this);
                 if (values[0] + 1 >= (lm_stubs.Count + 1) / 2) return true;
@@ -86,7 +86,7 @@ namespace DADTKV_LM.Contact
         private void sendAccepted(ref List<int> values, PaxosService.PaxosServiceClient stub, AcceptRequest request)
         {
             AcceptReply reply = stub.AcceptedAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();
-            lock (values)
+            lock (this)
             {
                 if (reply.Ack) values[0]++;
                 else values[1]++;
@@ -95,6 +95,14 @@ namespace DADTKV_LM.Contact
         }
         public bool getLeaderAck(int possible_leader)
         {
+            if (lm_stubs == null) //É preciso?
+            {
+                lm_stubs = new List<PaxosService.PaxosServiceClient>();
+                foreach (GrpcChannel channel in lm_channels)
+                {
+                    lm_stubs.Add(new PaxosService.PaxosServiceClient(channel));
+                }
+            }
             return lm_stubs[possible_leader].GetLeaderAckAsync(new AckRequest(), new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult().Ack;
         }
     }
