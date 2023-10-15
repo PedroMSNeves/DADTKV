@@ -6,7 +6,7 @@ namespace DADTKV_LM.Contact
     public class LmContact
     {
         private string _name;
-        public List<PaxosService.PaxosServiceClient> lm_stubs = new List<PaxosService.PaxosServiceClient>();
+        public List<PaxosService.PaxosServiceClient> lm_stubs = null;
         List<GrpcChannel> lm_channels = new List<GrpcChannel>();
 
         public LmContact(string name, List<string> lm_urls)

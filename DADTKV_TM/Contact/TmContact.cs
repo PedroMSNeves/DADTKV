@@ -8,7 +8,7 @@ namespace DADTKV_TM.Contact
     /// </summary>
     public class TmContact
     {
-        List<BroadCastService.BroadCastServiceClient> tm_stubs = new List<BroadCastService.BroadCastServiceClient>();
+        List<BroadCastService.BroadCastServiceClient> tm_stubs = null;
         List<GrpcChannel> tm_channels = new List<GrpcChannel>();
 
         public TmContact(List<string> tm_urls)
