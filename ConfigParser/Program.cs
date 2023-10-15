@@ -17,7 +17,7 @@ namespace ConfigParser
         public static void launchClient(string id, string clientScript, List<string> transactionManagers)
         {
             // Pass all Transaction Manager URLs to the client
-            string args = $"{id}";
+            string args = $"{clientScript} {id}";
             foreach (string transactionManager in transactionManagers)
             {
                 args += $" {transactionManager}";
@@ -27,9 +27,6 @@ namespace ConfigParser
 
             Console.WriteLine($"Launching client {id} with script {clientScript}");
             client.Start();
-
-            string input = File.ReadAllText(clientScript);
-            client.StandardInput.Write(input);
         }
 
         public static void launchServer(string id, string url, string args)
