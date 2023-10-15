@@ -8,7 +8,7 @@
             Console.WriteLine($"ERROR: {message}");
             Console.WriteLine("Press any key to close.");
             Console.ReadKey();
-            Environment.Exit(0);
+            Environment.Exit(-1);
         }
 
         private static ClientLogic argsPrep(string[] args)
