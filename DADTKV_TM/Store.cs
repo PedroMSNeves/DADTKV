@@ -274,7 +274,7 @@ namespace DADTKV_TM
 
                     verifyMaybes(fl,reqs,i);
 
-                    LeaseRemove(fl.Keys[0], _name);
+                    LeaseRemove(fl.Keys[0], _name, false);
 
 
                     // Moves it to the pickup waiting place
@@ -344,7 +344,7 @@ namespace DADTKV_TM
             {
                 if (tm_name != null && writes.Count != 0)
                 {
-                    if (!LeaseRemove(writes[0].Key, tm_name)) return false; // Always goes well because they are all correct servers
+                    if (!LeaseRemove(writes[0].Key, tm_name, false)) return false; // Always goes well because they are all correct servers
                 }
                 foreach (DadIntTmProto write in writes) { _store[write.Key] = write.Value; }
 
@@ -357,12 +357,12 @@ namespace DADTKV_TM
         /// <param name="firstkey"></param>
         /// <param name="tm_name"></param>
         /// <returns></returns>
-        public bool LeaseRemove(string firstkey, string tm_name)
+        public bool LeaseRemove(string firstkey, string tm_name,bool residual)
         {
             FullLease fl;
             if (_leases[firstkey].TryPeek(out var lease)) fl = (FullLease)lease; // Gets FullLease
             else return false; // Theoretically never possible
-            if (fl.End == false) return true;
+            if (!residual && fl.End == false) return true;
             // Verify all entries
             foreach (string key in fl.Keys)
             {
@@ -390,7 +390,7 @@ namespace DADTKV_TM
         {
             foreach (string key in firstKeys)
             {
-                LeaseRemove(key, name);
+                LeaseRemove(key, name, true);
             }
             return true;
         }
@@ -611,7 +611,14 @@ namespace DADTKV_TM
             }
             // We will send the first key of every list to delete to all other Tm's, because they can get the full lease that way
             List<string> firstKeys = new List<string>();
-            foreach (FullLease fl in residual) if (fl.Intersection(newLeases)) firstKeys.Add(fl.Keys[0]);
+            foreach (FullLease fl in residual)
+            {
+                if (fl.Intersection(newLeases)) 
+                {
+                    fl.End = true;
+                    firstKeys.Add(fl.Keys[0]); 
+                }
+            }
             if(_tmContact.DeleteResidualKeys(firstKeys, _name)) // Theoredicaly never fails
             {
                 foreach (FullLease fl in residual)
@@ -620,7 +627,7 @@ namespace DADTKV_TM
                     if (fl.Intersection(newLeases))
                     {
                         // Eliminates our Lease from all the _leases queues and the _fullLease list
-                        LeaseRemove(fl.Keys[0], _name);
+                        LeaseRemove(fl.Keys[0], _name,true);
                     }
                 }
             }
