@@ -25,16 +25,9 @@ namespace ConfigParser
                 args += $" {transactionManager}";
             }
 
-            Process client = createProcess("Client", args);
-
             Console.WriteLine($"Launching client {id} with script {clientScript}");
+            Process client = createProcess("Client", args);
             client.Start();
-        }
-
-        public static void launchServer(string id, string url, string args)
-        {
-            Process server = createProcess("Server", $"{id} {url} {args}");
-            server.Start();
         }
 
         public static void launchTransactionManager(string id, string url, List<string> transactionManagers, List<string> leaseManagers)
@@ -55,7 +48,8 @@ namespace ConfigParser
             }
 
             Console.WriteLine($"Launching Transaction Manager {id} with url {url}");
-            launchServer(id, url, args);
+            Process server = createProcess("DADTKV_TM", $"{id} {url} {args}");
+            server.Start();
         }
 
         public static void launchLeaseManager(string id, int paxos_id, string url, List<string> transactionManagers, List<string> leaseManagers)
@@ -76,7 +70,8 @@ namespace ConfigParser
             }
 
             Console.WriteLine($"Launching Lease Manager {id} with url {url}");
-            launchServer(id, url, args);
+            Process server = createProcess("DADTKV_LM", $"{id} {url} {args}");
+            server.Start();
         }
         public static void Main(string[] args)
         {
