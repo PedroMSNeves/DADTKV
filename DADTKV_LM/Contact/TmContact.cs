@@ -17,15 +17,18 @@ namespace DADTKV_LM.Contact
         {
             LeaseReply reply;
             LeaseBroadCastRequest request = new LeaseBroadCastRequest { Epoch = epoch }; //cria request
-                                     //request.Leases.AddRange(leases);
+                                                                                         //request.Leases.AddRange(leases);
             Console.WriteLine("sent");
-            Thread.Sleep(50000);
+            //Thread.Sleep(50000);
             foreach (Request r in leases)
             {
                 LeaseProto lp = new LeaseProto { Tm = r.Tm_name };
                 foreach (string k in r.Keys) { lp.Keys.Add(k); }
                 request.Leases.Add(lp);
             }
+            LeaseProto xp = new LeaseProto { Tm = "tm1" };
+            xp.Keys.Add("name3");
+            request.Leases.Add( xp );
 
             if (tm_stubs == null)
             {
@@ -33,6 +36,7 @@ namespace DADTKV_LM.Contact
 
                 foreach (GrpcChannel channel in tm_channels)
                 {
+                    Console.WriteLine(channel.Target);
                     tm_stubs.Add(new LeaseService.LeaseServiceClient(channel));
                 }
             }
@@ -40,7 +44,8 @@ namespace DADTKV_LM.Contact
             foreach (LeaseService.LeaseServiceClient stub in tm_stubs)
             {
 
-                reply = stub.LeaseBroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
+                reply = stub.LeaseBroadCastAsync(request).GetAwaiter().GetResult(); // tirar isto de syncrono
+                Console.WriteLine("YES");
             }
         }
     }

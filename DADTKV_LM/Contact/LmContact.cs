@@ -20,6 +20,14 @@ namespace DADTKV_LM.Contact
         {
             Promise reply;
             int promises = 1;
+            if (lm_stubs == null)
+            {
+                lm_stubs = new List<PaxosService.PaxosServiceClient>();
+                foreach (GrpcChannel channel in lm_channels)
+                {
+                    lm_stubs.Add(new PaxosService.PaxosServiceClient(channel));
+                }
+            }
             foreach (PaxosService.PaxosServiceClient stub in lm_stubs)
             {
                 reply = stub.PrepareAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
