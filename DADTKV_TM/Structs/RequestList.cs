@@ -44,9 +44,13 @@ namespace DADTKV_TM.Structs
         }
         public void remove(int i)
         {
-            buffer.RemoveAt(i);
-            buzy--;
-            Monitor.PulseAll(this);
+            lock (this)
+            {
+                buffer.RemoveAt(i);
+                buzy--;
+
+                Monitor.PulseAll(this);
+            }
         }
         public void move(int transaction_number, List<DadIntProto> resultT, int err)
         {
