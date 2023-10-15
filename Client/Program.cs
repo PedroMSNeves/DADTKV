@@ -2,50 +2,61 @@
 {
 
     class Program
-    { /* Input: "Name tmurl1 tmurl2 ...*/
-        private static ClientLogic args_prep(string[] args)
+    { /* expected input: config_file name tmurl1 tmurl2 ... */
+        private static void exitOnError(string message)
         {
-            ClientLogic clientLogic;
-            if (args.Length == 0 || args.Length == 1)
-            {
-                Console.WriteLine("ERROR: Invalid number of args");
-                Console.WriteLine("Press any key to close");
-                Console.ReadKey();
-                Environment.Exit(0);
-            }
-            clientLogic = new ClientLogic(args[0]);
+            Console.WriteLine($"ERROR: {message}");
+            Console.WriteLine("Press any key to close.");
+            Console.ReadKey();
+            Environment.Exit(0);
+        }
 
-            for (int i = 1; i < args.Length; i++) clientLogic.AddServer(args[i]);
-
+        private static ClientLogic argsPrep(string[] args)
+        {
+            if (args.Length < 3) exitOnError("Invalid number of arguments");
+            ClientLogic clientLogic = new ClientLogic(args[1]);
+            for (int i = 2; i < args.Length; i++) clientLogic.AddServer(args[i]);
             return clientLogic;
         }
 
         public static void Main(string[] args)
         {
-            ClientLogic clientLogic = args_prep(args);
+            ClientLogic clientLogic = argsPrep(args);
 
-            while (true)
+            string[] lines = System.IO.File.ReadAllLines(args[0]);
+            foreach (string line in lines)
             {
-                char key = Console.ReadKey().KeyChar;
-                switch (key)
+                string[] words = line.Split(' ');
+                if (words[0].Length != 1) exitOnError("Invalid command");
+
+                char c = words[0][0];
+                switch (c)
                 {
-                    case 'T':
-                        clientLogic.Transaction();
-                        break;
-                    case 'W':
-                        clientLogic.Sleep(); // verificar read dentro da funcao 
-                        break;
                     case 'S':
                         clientLogic.Status(); // vai buscar o estado de cada server
                         /* Perguntar se temos de meter o estado te todos os clients,tm e lm ou se chega apenas dos tm
                          * Possivelmente podemos meter cada tm a dizer o que pensa dos outros tm e lm (de quem suspeita)
                          */
                         break;
-                    case '#':
-                        while (Console.ReadKey().KeyChar != '\n') ; // Reads and ignores line
+                    case 'T':
+                        if (words.Length < 3) exitOnError("Invalid transaction");
+
+                        List<string> reads = new List<string>();
+                        Dictionary<string, int> writes = new Dictionary<string, int>();
+
+                        int i = 0;
+                        string restOfLine = line.Substring(2); ;
+                        if (!Parse_Lib.Parse.ParseReads(restOfLine, ref i, out reads)) exitOnError("Bad read transaction format");
+                        if (!Parse_Lib.Parse.ParseWrites(restOfLine, ref i, out writes)) exitOnError("Bad write transaction format");
+                        clientLogic.Transaction(reads, writes);
                         break;
-                    case ' ':
-                        break; // It will read the next char
+                    case 'W':
+                        int miliseconds = Parse_Lib.Parse.ParseInt(words[1]);
+                        if (miliseconds < 0) exitOnError("Invalid number of miliseconds");
+                        clientLogic.Sleep(miliseconds);
+                        break;
+                    case '#':
+                        continue;
                 }
             }
         }

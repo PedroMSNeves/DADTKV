@@ -6,15 +6,14 @@
         /// Tries to read an int from the input, gives -1 if it does not succeed
         /// </summary>
         /// <returns></returns>
-        public static int ParseInt()
+        public static int ParseInt(string word)
         {
             int val;
-            string newline = Console.ReadLine();
-            if (newline == null) { return -1; }
-
-            if (int.TryParse(newline, out val)) return val;
+            if (word == null) return -1;
+            if (int.TryParse(word, out val)) return val;
             return -1;
         }
+
         /// <summary>
         /// Tries to parse the string to have a string with no "normal" spaces (does not eliminate the spaces in names)
         /// </summary>
@@ -36,6 +35,7 @@
             }
             return reduced;
         }
+
         /// <summary>
         /// Tries to parse the read part of a transaction, from a string to a List of strings
         /// </summary>
@@ -43,25 +43,26 @@
         /// <param name="i"></param>
         /// <param name="reads"></param>
         /// <returns></returns>
-        public static bool ParseReads(string newline, ref int i, out List<string> reads)
+        public static bool ParseReads(string line, ref int i, out List<string> reads)
         {
             reads = new List<string>();
-            if (newline[i] != '(') { return false; }
+            if (line[i] != '(') { return false; }
             i++;
-            while (i < newline.Length && newline[i] != ')')
+            while (i < line.Length && line[i] != ')')
             {
                 string name = "";
-                if (!ParseString(newline, ref i, ref name)) return false;
+                if (!ParseString(line, ref i, ref name)) return false;
                 reads.Add(name);
 
-                if (newline[i] == ',') { i++; }
-                else if (newline[i] != ')') return false;
+                if (line[i] == ',') { i++; }
+                else if (line[i] != ')') return false;
             }
-            if (i >= newline.Length) return false;
+            if (i >= line.Length) return false;
             i++;
-            if (i >= newline.Length) return false;
+            if (i >= line.Length) return false;
             return true;
         }
+
         /// <summary>
         /// Tries to parse the write part of a transaction, from a string to a Dictionary of <string,int> (key,value)
         /// </summary>
@@ -69,22 +70,22 @@
         /// <param name="i"></param>
         /// <param name="writes"></param>
         /// <returns></returns>
-        public static bool ParseWrites(string newline, ref int i, out Dictionary<string, int> writes)
+        public static bool ParseWrites(string line, ref int i, out Dictionary<string, int> writes)
         {
             writes = new Dictionary<string, int>();
-            if (newline[i] != '(') { return false; }
+            if (line[i] != '(') { return false; }
             i++;
-            while (i < newline.Length && newline[i] != ')')
+            while (i < line.Length && line[i] != ')')
             {
                 string name;
                 int val;
-                if (!ParseDict(newline, ref i, out name, out val)) return false;
+                if (!ParseDict(line, ref i, out name, out val)) return false;
                 writes.Add(name, val);
 
-                if (newline[i] == ',') { i++; }
-                else if (newline[i] != ')') return false;
+                if (line[i] == ',') { i++; }
+                else if (line[i] != ')') return false;
             }
-            if (i >= newline.Length) return false;
+            if (i >= line.Length) return false;
             return true;
         }
         /// <summary>
