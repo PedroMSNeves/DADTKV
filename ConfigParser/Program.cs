@@ -8,7 +8,7 @@ namespace ConfigParser
         {
             Process process = new Process();
             process.StartInfo.FileName = "cmd.exe";
-            process.StartInfo.Arguments = $"/c dotnet run --project {project} {arguments}";
+            process.StartInfo.Arguments = $"/c {project}" + @"\bin\Debug\net6.0\" + $"{project}.exe {arguments}";
             process.StartInfo.UseShellExecute = true;
             process.StartInfo.CreateNoWindow = false;
             return process;
