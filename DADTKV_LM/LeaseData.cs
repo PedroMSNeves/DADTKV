@@ -33,7 +33,7 @@ namespace DADTKV_LM
         {
             lock (this)
             {
-                _requests.Add(request);
+                _requests.Add(request);                
             }
         }
         public void AddRequestBeginning(Request request) //nao ness

@@ -1,6 +1,7 @@
 ﻿using Grpc.Core;
 using Grpc.Net.Client;
 using DADTKV_LM.Structs;
+using System;
 
 namespace DADTKV_LM.Contact
 {
@@ -11,29 +12,39 @@ namespace DADTKV_LM.Contact
 
         public TmContact(List<string> tm_urls)
         {
-            foreach (string url in tm_urls) tm_channels.Add(GrpcChannel.ForAddress(url));
+            foreach (string url in tm_urls)
+            {
+                try
+                {
+                    tm_channels.Add(GrpcChannel.ForAddress(url));
+                }
+                catch (System.UriFormatException)
+                {
+                    Console.WriteLine("ERROR: Invalid Tm server url");
+                }
+            }
         }
         public void BroadLease(int epoch, List<Request> leases)
         {
             LeaseReply reply;
             LeaseBroadCastRequest request = new LeaseBroadCastRequest { Epoch = epoch }; //cria request
                                                                                          //request.Leases.AddRange(leases);
+            Console.WriteLine(leases.Count);
             Console.WriteLine("sent");
             //Thread.Sleep(50000);
-            foreach (Request r in leases)
+            foreach (Request r in leases) //as leases vem vazias
             {
                 LeaseProto lp = new LeaseProto { Tm = r.Tm_name };
                 foreach (string k in r.Keys) { lp.Keys.Add(k); }
                 request.Leases.Add(lp);
             }
-            LeaseProto xp = new LeaseProto { Tm = "tm1" };
-            xp.Keys.Add("name3");
-            request.Leases.Add( xp );
+            //LeaseProto xp = new LeaseProto { Tm = "tm1" };
+            //xp.Keys.Add("name3");
+            //request.Leases.Add( xp );
 
             if (tm_stubs == null)
             {
                 tm_stubs = new List<LeaseService.LeaseServiceClient>();
-
                 foreach (GrpcChannel channel in tm_channels)
                 {
                     Console.WriteLine(channel.Target);
@@ -43,9 +54,9 @@ namespace DADTKV_LM.Contact
 
             foreach (LeaseService.LeaseServiceClient stub in tm_stubs)
             {
-
+                Console.WriteLine(request.Leases.Count);
                 reply = stub.LeaseBroadCastAsync(request).GetAwaiter().GetResult(); // tirar isto de syncrono
-                Console.WriteLine("YES");
+                Console.WriteLine("DONE");
             }
         }
     }

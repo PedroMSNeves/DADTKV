@@ -54,6 +54,12 @@ namespace DADTKV_LM.Impls
                 {
                     while (_data.IsLeader)
                     {
+                        My_value = _data.GetMyValue();
+                        while (My_value.Count == 0)
+                        {
+                            Thread.Sleep(1000);
+                            My_value = _data.GetMyValue();
+                        }
                         Epoch = Epoch + 1; //implementar tempo
                         while (!PrepareRequest())
                         {
