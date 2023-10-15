@@ -21,8 +21,10 @@ namespace DADTKV_TM.Impls
         public LeaseReply LBCast(LeaseBroadCastRequest request)
         {
             List<FullLease> leases = new List<FullLease>();
+            Console.WriteLine("newleases");
             foreach (LeaseProto lp in request.Leases)
             {
+                Console.WriteLine(lp.ToString());
                 leases.Add(new FullLease(lp.Tm,request.Epoch,lp.Keys.ToList()));
             }
             store.NewLeases(leases, request.Epoch);

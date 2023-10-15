@@ -28,6 +28,8 @@ namespace DADTKV_TM
             _fullLeases = new List<FullLease>();
             possible_execute = false;
         }
+
+
         //////////////////////////////////////////////USED BY SERVERSERVICE////////////////////////////////////////////////////////////
         /// <summary>
         /// Used by the ServerService class (add new client transactions)
@@ -78,15 +80,10 @@ namespace DADTKV_TM
             lock (this)
             {
                 bool maybeOnly = false;
-                
-                  
                 for (int i = 0; i< reqs.Count; i++)
                 {
-
-                    if (reqs[i].Situation == leaseRequested.Yes) { continue; }
-                    else if(reqs[i].Situation == leaseRequested.No)
+                    if (reqs[i].Situation == leaseRequested.No)
                     {
-                        Console.WriteLine(reqs[0].Situation);
 
                         /*
                          * Verificar se temos a lease atualmente
@@ -100,6 +97,7 @@ namespace DADTKV_TM
                             FullLease fl = (FullLease) lease;
                             if (reqs[i].SubGroup(fl))
                             {
+
                                 foreach (string key in fl.Keys)
                                 {
                                     // Verify if we have all the lease on the top
@@ -121,7 +119,6 @@ namespace DADTKV_TM
                         }
                         else completed = false;
 
-                        Console.WriteLine(reqs[0].Situation);
 
                         if (completed)
                         {
@@ -132,7 +129,6 @@ namespace DADTKV_TM
                                 // if nao fica a Yes se nao tiver nenhuma intersessao com outro request anterior ai fica a N  (para manter ordem total) 
                                 reqs[i].Situation = leaseRequested.Yes;
                                 possible_execute = true;
-                                continue;
                             }
                             else
                             {
@@ -142,9 +138,6 @@ namespace DADTKV_TM
                                 continue;
                             }
                         }
-                        Console.WriteLine(reqs[0].Situation);
-
-
 
                         // vai ter subreposicao com parte da veri de cima, mas tem casos diff, os que ainda nao temos a lease, mas ja pedimos
                         for (int j = 0; j < i; j++)
@@ -157,97 +150,21 @@ namespace DADTKV_TM
                                     maybeOnly = true;
                                     break;
                                 }
-                                else
-                                {
-                                    reqs[i].Situation = leaseRequested.No;
-                                }
-                                
+                                else reqs[i].Situation = leaseRequested.No;
                             }
                         }
                         // to have MAYBE TRUE we can store all maybe keys and see if we intersect some if not, we can turn true 
                         // right now we cant have Maybe true, only maybe maybe or maybe no
                         if (!maybeOnly && reqs[i].Situation == leaseRequested.No)
                         {
-                            Console.WriteLine(reqs[0].Situation);
                             _lmcontact.RequestLease(reqs[i].Keys);
                             reqs[i].Situation = leaseRequested.Yes;
-                            Console.WriteLine(reqs[0].Situation);
-
+                            Console.WriteLine("Yes");
                         }
                     }
-                    else // é o maybe
-                    {
-                        /*
-                         * se tivermos a lease e nao tivermos intersessoes com pessoal atras fica a sim
-                         */
-                        bool completed = true;
-                        FullLease fl;
-                        if (_leases[reqs[i].Keys[0]].TryPeek(out var lease) && lease.Tm_name == _name)
-                        {
-                            fl = (FullLease)lease;
-                            if (reqs[i].SubGroup(fl))
-                            {
-                                foreach (string key in fl.Keys)
-                                {
-                                    // Verify if we have all the lease on the top
-                                    if (_leases[key].TryPeek(out var l))
-                                    {
-                                        if (fl != (FullLease)l)
-                                        {
-                                            completed = false;
-                                            break;
-                                        }
-                                    }
-                                    else
-                                    {
-                                        completed = false;
-                                        break; // Theoredicaly impossible
-                                    }
-                                }
-                            }
-                        }
-                        else
-                        {
-                            completed = false;
-                        }
-                        if (!completed)
-                        {
-                            _lmcontact.RequestLease(reqs[i].Keys);
-                            reqs[i].Situation = leaseRequested.Yes;
-                            continue;                        
-                        }
-                        /*    0         1  
-                         *   <A,C> <X,Z>   <A,B> <X> <Z>
-                         * A 11
-                         * B
-                         * C 11
-                         * 
-                         * If the lease intersects any other lease before you, it's impossible to reach you
-                         */
-                        fl =(FullLease)_leases[reqs[i].Keys[0]].Peek();
-                        for (int j = 0; j < i; j++)
-                        {
-                            /* If the lease intersects someone before you not being a subgroup of the lease:
-                             * - the lease is residual and was deleted (for conflicts with the new leases)
-                             * - the lease was used for a transaction before you and got deleted (for conflicts with the new leases)
-                             * - the lease is there but there is a subgroup of it before you
-                             * - your turn
-                             */
-                            if (fl.Intersection(reqs[j])) //ERROR:  intersessao da lease com os J
-                            {
-                                completed = false;
-                                break;
-                            }
-                        }
-                        if(completed)
-                        {
-                            reqs[i].Situation = leaseRequested.Yes;
-                            possible_execute = true;
-                        }
-                    }
+                    else if (reqs[i].Situation == leaseRequested.Maybe) maybeOnly = true;
                 }
-                Console.WriteLine(reqs[0].Situation);
-                if(possible_execute) Execute(ref reqs);
+                if (possible_execute) Execute(ref reqs);
             }
             
         }
@@ -310,6 +227,10 @@ namespace DADTKV_TM
                     // Try again, only one time
                     if (err == -2) err = Request(reqs[i].Reads, reqs[i].Writes, ref reply);
 
+                    verifyMaybes(fl,reqs,i);
+
+                    LeaseRemove(fl.Keys[0], _name);
+
 
                     // Moves it to the pickup waiting place
                     _reqList.move(reqs[i].Transaction_number, reply, err);
@@ -325,6 +246,33 @@ namespace DADTKV_TM
             }
             possible_execute = false;
         }
+        public void verifyMaybes(FullLease fl, List<Request> reqs, int i)
+        {
+            //se for para terminar as outras ficam a nao
+            if (fl.End)
+            {
+                for(int j  = i; j < reqs.Count; j++)
+                {
+                    if (reqs[j].SubGroup(fl)) reqs[j].Situation = leaseRequested.No;
+                }
+                return;
+            }
+            //se nao for para apagar mete sim na proxima
+            foreach(Request r in reqs) foreach (DadIntProto key in r.Writes) Console.WriteLine(r.Transaction_number + ":" + key +":" + r.Situation);
+            
+            for (int j = i+1; j < reqs.Count; j++)
+            {
+                if (reqs[j].SubGroup(fl))
+                {
+                    //maybe verificar intercessoes entre i+1 e j
+                    reqs[j].Situation = leaseRequested.Yes;
+                    foreach (Request r in reqs) foreach (DadIntProto key in r.Writes) Console.WriteLine(r.Transaction_number + ":" + key + ":" + r.Situation);
+                    return;
+                }
+            }
+
+        }
+
         /// <summary>
         /// Executes a request per say and broadcast the changes
         /// </summary>
@@ -357,6 +305,7 @@ namespace DADTKV_TM
                     if (!LeaseRemove(writes[0].Key, tm_name)) return false; // Always goes well because they are all correct servers
                 }
                 foreach (DadIntTmProto write in writes) { _store[write.Key] = write.Value; }
+
             }
             return true;
         }
@@ -369,9 +318,9 @@ namespace DADTKV_TM
         public bool LeaseRemove(string firstkey, string tm_name)
         {
             FullLease fl;
-            if(_leases[firstkey].TryPeek(out var lease)) fl = (FullLease)lease; // Gets FullLease
+            if (_leases[firstkey].TryPeek(out var lease)) fl = (FullLease)lease; // Gets FullLease
             else return false; // Theoretically never possible
-
+            if (fl.End == false) return true;
             // Verify all entries
             foreach (string key in fl.Keys)
             {

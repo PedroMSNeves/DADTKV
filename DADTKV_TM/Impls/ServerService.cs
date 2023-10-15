@@ -24,7 +24,6 @@ namespace DADTKV_TM.Impls
             ResultOfTransaction reply;
             List<string> reads = request.Reads.ToList();
             List<DadIntProto> writes = request.Writes.ToList();
-
             int tnum = _store.verifyAndInsertRequest(reads, writes);
             if (tnum == -1) { throw new RpcException(new Status(StatusCode.NotFound, "Read key not found")); }
             reply = _store.getResult(tnum);
