@@ -12,6 +12,7 @@ namespace DADTKV_TM
         private Dictionary<string, int> _store;
         private Dictionary<string, Queue<Lease>> _leases;
         private List<FullLease> _fullLeases;
+        private bool possible_execute;
 
         private RequestList _reqList;
         LmContact _lmcontact;
@@ -25,6 +26,7 @@ namespace DADTKV_TM
             _tmContact = new TmContact(tm_urls);
             _lmcontact = new LmContact(name, lm_urls);
             _fullLeases = new List<FullLease>();
+            possible_execute = false;
         }
         //////////////////////////////////////////////USED BY SERVERSERVICE////////////////////////////////////////////////////////////
         /// <summary>
@@ -129,6 +131,7 @@ namespace DADTKV_TM
                                 // if sim fica a Maybe
                                 // if nao fica a Yes se nao tiver nenhuma intersessao com outro request anterior ai fica a N  (para manter ordem total) 
                                 reqs[i].Situation = leaseRequested.Yes;
+                                possible_execute = true;
                                 continue;
                             }
                             else
@@ -239,11 +242,12 @@ namespace DADTKV_TM
                         if(completed)
                         {
                             reqs[i].Situation = leaseRequested.Yes;
+                            possible_execute = true;
                         }
                     }
                 }
                 Console.WriteLine(reqs[0].Situation);
-                Execute(ref reqs);
+                if(possible_execute) Execute(ref reqs);
             }
             
         }
@@ -315,10 +319,11 @@ namespace DADTKV_TM
 
 
                 }
-                i++;  
+                i++;
+
                 if (i >= reqs.Count)  break;
             }
-           
+            possible_execute = false;
         }
         /// <summary>
         /// Executes a request per say and broadcast the changes
@@ -413,6 +418,7 @@ namespace DADTKV_TM
             //eliminar leases residuais
             lock (this)
             {
+                possible_execute = true;
                 DeleteResidualLeases(leases, epoch, out int numberOfSameEpoch);
                 foreach (FullLease fl in leases)
                 {

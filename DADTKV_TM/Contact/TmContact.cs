@@ -57,6 +57,14 @@ namespace DADTKV_TM.Contact
             BroadReply reply;
             ResidualDeletionRequest residualDeletionRequest = new ResidualDeletionRequest { TmName = name };
             residualDeletionRequest.FirstKeys.AddRange(residualKeys);
+            if (tm_stubs == null)
+            {
+                tm_stubs = new List<BroadCastService.BroadCastServiceClient>();
+                foreach (GrpcChannel channel in tm_channels)
+                {
+                    tm_stubs.Add(new BroadCastService.BroadCastServiceClient(channel));
+                }
+            }
             foreach (BroadCastService.BroadCastServiceClient stub in tm_stubs)
             {
                 reply = stub.ResidualDeletionAsync(residualDeletionRequest, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
