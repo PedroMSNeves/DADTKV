@@ -88,8 +88,8 @@ namespace ConfigParser
             // Save client IDs and scripts to launch them
             Dictionary<string, string> clients = new Dictionary<string, string>();
 
-            string line;
-            while ((line = Console.ReadLine()) != null)
+            string[] lines = File.ReadAllLines(args[0]);
+            foreach (string line in lines)
             {
                 string[] words = line.Split(' ');
 
