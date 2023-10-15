@@ -260,6 +260,7 @@ namespace DADTKV_TM
                 if (reqs[i].Situation != leaseRequested.Yes) break;
                 else // Request marked with Yes
                 {
+
                     FullLease fl;
                     /* We can use first key to get the lease from a queue,
                        because you can only be marked with Yes if you have a lease waiting for you or you have requested a lease */
@@ -297,9 +298,6 @@ namespace DADTKV_TM
                     else continue;/* If the lease is not of our Tm or the queue is empty:
                                    * The new set of leases did not arrive yet
                                    * Or is waiting for another Tm to end is lease */
-
-                    // Remove from the request list
-                    _reqList.remove(i);
                     List<DadIntProto> reply = new List<DadIntProto>();
 
                     // Tries to propagate
@@ -308,8 +306,13 @@ namespace DADTKV_TM
                     // Try again, only one time
                     if (err == -2) err = Request(reqs[i].Reads, reqs[i].Writes, ref reply);
 
+
                     // Moves it to the pickup waiting place
                     _reqList.move(reqs[i].Transaction_number, reply, err);
+
+                    // Remove from the request list
+                    _reqList.remove(i);
+
 
                 }
                 i++;  
