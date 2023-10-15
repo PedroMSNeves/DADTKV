@@ -8,7 +8,9 @@ namespace ConfigParser
         {
             Process process = new Process();
             process.StartInfo.FileName = "cmd.exe";
-            process.StartInfo.Arguments = $"/c {project}" + @"\bin\Debug\net6.0\" + $"{project}.exe {arguments}";
+
+            string solutionDir = Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory)?.Parent?.Parent?.Parent?.Parent?.FullName ?? "";
+            process.StartInfo.Arguments = $"/c " + solutionDir + @"\" + project + @"\bin\Debug\net6.0\" + $"{project}.exe {arguments}";
             process.StartInfo.UseShellExecute = true;
             process.StartInfo.CreateNoWindow = false;
             return process;
