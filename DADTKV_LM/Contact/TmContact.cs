@@ -58,7 +58,8 @@ namespace DADTKV_LM.Contact
                 Console.WriteLine(request.Leases.Count);
                 try
                 {
-                    replies.Add(stub.LeaseBroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10)))); //fazer isto num try
+                    Grpc.Core.AsyncUnaryCall<LeaseReply> reply = stub.LeaseBroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10)));
+                    replies.Add(reply); //fazer isto num try
                 }
                 catch (RpcException ex) when(ex.StatusCode == StatusCode.DeadlineExceeded)
 {
