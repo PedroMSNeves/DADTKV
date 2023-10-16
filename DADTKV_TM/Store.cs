@@ -45,7 +45,7 @@ namespace DADTKV_TM
             {
                 foreach (string read in reads)
                 {
-                    if (!_store.ContainsKey(read)) { return -1; }
+                    if (!_store.ContainsKey(read)) { return -1; } // maybe meter timeout depois renbenta
                 }
                 foreach (DadIntProto write in writes)
                 {
@@ -155,10 +155,8 @@ namespace DADTKV_TM
                          * depois da veri, se ainda a N pedir se nao tiver com o maybe antes
                          * Marca a T
                          */
-                        //Verify if there is a completed lease
-                        bool completed = true;
                         FullLease fl;
-                        // Enters if it has a full lease
+                        // Enters if it has a compleated lease
                         if (fullLease(reqs[i], out fl))
                         {
                             if (!maybeOnly)
@@ -188,7 +186,6 @@ namespace DADTKV_TM
                         if (!maybeOnly && reqs[i].Situation == leaseRequested.No)
                         {
                             _lmcontact.RequestLease(reqs[i].Keys);
-
                             reqs[i].Situation = leaseRequested.Yes;
                             possible_execute = true;
                         }                    
@@ -288,7 +285,8 @@ namespace DADTKV_TM
             if(writes.Count != 0)
             {
                 Console.WriteLine("EPOCHS: " + epoch + " " + _reqList.get_epoch());
-                if (!_tmContact.BroadCastChanges(writes, _name, epoch)) return -2;
+                if (fl.End) if (!_tmContact.BroadCastChanges(writes, _name, epoch)) return -2; // possivel bug de eliminar leases noutros tms
+                else { if (!_tmContact.BroadCastChanges(writes, "_", epoch)) return -2; }// possivel bug de eliminar leases noutros tms
             }
             else
             {
@@ -314,7 +312,7 @@ namespace DADTKV_TM
         {
             lock (this)
             {
-                if (tm_name != null && writes.Count != 0)
+                if (tm_name != "_")
                 {
                     if (!LeaseRemove(writes[0].Key, tm_name, epoch)) return false; // Always goes well because they are all correct servers
                 }
@@ -443,7 +441,7 @@ namespace DADTKV_TM
                 //fim
                 foreach (FullLease lease in _fullLeases) foreach (string key in lease.Keys) Console.WriteLine(key + ":" + lease.End);
             }
-        }
+        } 
 
         private void RaiseEpochOfNewRequests(List<FullLease> newLeases, int epoch, int numberOfSameEpoch)
         {
