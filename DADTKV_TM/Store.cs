@@ -359,7 +359,7 @@ namespace DADTKV_TM
             {
                 if (tm_name != null && writes.Count != 0)
                 {
-                    if (!LeaseRemove(writes[0].Key, tm_name, false)) return false; // Always goes well because they are all correct servers
+                    if (!LeaseRemove(writes[0].Key, tm_name, true)) return false; // Always goes well because they are all correct servers
                 }
                 foreach (DadIntTmProto write in writes) { _store[write.Key] = write.Value; }
                 Console.WriteLine("EnD write");
@@ -374,6 +374,13 @@ namespace DADTKV_TM
         /// <returns></returns>
         public bool LeaseRemove(string firstkey, string tm_name,bool residual)
         {
+            Console.WriteLine("LEASE REMOVE");
+            foreach (FullLease ll in _fullLeases)
+            {
+                Console.Write("FL: ");
+                foreach (string s in ll.Keys) { Console.Write(s + " "); }
+                Console.WriteLine();
+            }
             FullLease fl;
             if (_leases[firstkey].TryPeek(out var lease)) fl = (FullLease)lease; // Gets FullLease
             else return false; // Theoretically never possible
@@ -393,6 +400,16 @@ namespace DADTKV_TM
                 _leases[key].Dequeue(); // Removes queue entries
             }
             _fullLeases.Remove(fl); // Removes lease list entry
+
+            Console.WriteLine("LEASE REMOVED");
+            foreach (FullLease ll in _fullLeases)
+            {
+                Console.Write("FL: ");
+                foreach (string s in ll.Keys) { Console.Write(s + " "); }
+                Console.WriteLine();
+            }
+
+
             return true;
         }
         /// <summary>
@@ -404,12 +421,24 @@ namespace DADTKV_TM
         public bool DeleteResidual(List<string> firstKeys, string name)
         {
             Console.WriteLine("delete");
+            foreach (FullLease fl in _fullLeases)
+            {
+                Console.Write("FL: ");
+                foreach (string s in fl.Keys) { Console.Write(s + " "); }
+                Console.WriteLine();
+            }
             foreach (string key in firstKeys)
             {
                 LeaseRemove(key, name, true);
             }
             Console.WriteLine("deleted");
-
+            foreach (FullLease fl in _fullLeases)
+            {
+                Console.Write("FL: ");
+                foreach (string s in fl.Keys) { Console.Write(s + " "); }
+                Console.WriteLine();
+            }
+            // testar ler leases para ver se apagou
             return true;
         }
         //////////////////////////////////////////////USED BY LSERVICE////////////////////////////////////////////////////////////
