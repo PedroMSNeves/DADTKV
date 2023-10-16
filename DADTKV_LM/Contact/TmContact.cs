@@ -24,11 +24,13 @@ namespace DADTKV_LM.Contact
                 }
             }
         }
-        public void BroadLease(int epoch, List<Request> leases)
+        public bool BroadLease(int epoch, List<Request> leases)
         {
-            List<Grpc.Core.AsyncUnaryCall<LeaseReply>> reply = new List<Grpc.Core.AsyncUnaryCall<LeaseReply>>();
+            List<Grpc.Core.AsyncUnaryCall<LeaseReply>> replies = new List<Grpc.Core.AsyncUnaryCall<LeaseReply>>();
             LeaseBroadCastRequest request = new LeaseBroadCastRequest { Epoch = epoch }; //cria request
                                                                                          //request.Leases.AddRange(leases);
+
+            int acks = 0;
             Console.WriteLine(leases.Count);
             Console.WriteLine("sent");
             //Thread.Sleep(50000);
@@ -54,10 +56,16 @@ namespace DADTKV_LM.Contact
             foreach (LeaseService.LeaseServiceClient stub in tm_stubs)
             {
                 Console.WriteLine(request.Leases.Count);
-                reply.Add(stub.LeaseBroadCastAsync(request)); // tirar isto de syncrono
+                replies.Add(stub.LeaseBroadCastAsync(request)); // tirar isto de syncrono
                 Console.WriteLine("DONE");
             }
-            //depois usar os valores do reply
+            foreach (Grpc.Core.AsyncUnaryCall<LeaseReply> reply in replies)
+            {
+                if (reply.ResponseAsync.Result.Ack) acks++;
+            }
+            Console.Write("RESULTADO PAXOS CHEGOU AOS TMs? ");
+            Console.WriteLine(acks);   
+            return acks > (tm_stubs.Count / 2); //aqui é todos ou maioria?
         }
     }
 }
