@@ -56,20 +56,19 @@ namespace DADTKV_LM.Contact
             foreach (LeaseService.LeaseServiceClient stub in tm_stubs)
             {
                 Console.WriteLine(request.Leases.Count);
-                try
-                {
-                    Grpc.Core.AsyncUnaryCall<LeaseReply> reply = stub.LeaseBroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10)));
-                    replies.Add(reply); //fazer isto num try
-                }
-                catch (RpcException ex) when(ex.StatusCode == StatusCode.DeadlineExceeded)
-{
-                    Console.WriteLine("Greeting timeout.");
-                }
+                replies.Add(stub.LeaseBroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10)))); //fazer isto num try
                 Console.WriteLine("DONE");
             }
             foreach (Grpc.Core.AsyncUnaryCall<LeaseReply> reply in replies)
             {
-                if (reply.ResponseAsync.Result.Ack) acks++;
+                try
+                {
+                    if (reply.ResponseAsync.Result.Ack) acks++;
+                }
+                catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded)
+                {
+                    Console.WriteLine("Greeting timeout.");
+                }
             }
             Console.Write("RESULTADO PAXOS CHEGOU AOS TMs? ");
             Console.WriteLine(acks);   
