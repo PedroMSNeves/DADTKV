@@ -546,8 +546,13 @@ namespace DADTKV_TM
              *      D   14                   |        17              |          20
              *      X   15                   |                   18   |
              */
+            foreach (FullLease fullLease in residual)
+            {
+                Console.WriteLine("FL "+ fullLease.Tm_name +": ");
+                foreach (string s in fullLease.Keys) Console.WriteLine(s + " ");
+                Console.WriteLine();
 
-
+            }
             // Removes all leases from residual list in queues marked to end, because if they have a lease to end before they execute, they didnt execute yet
             foreach (string key in _leases.Keys) 
             {
@@ -648,6 +653,15 @@ namespace DADTKV_TM
                     }
                 }
             }
+            Console.WriteLine("RESIDUAL END");
+            foreach (FullLease fullLease in residual)
+            {
+                Console.WriteLine("FL " + fullLease.Tm_name + ": ");
+                foreach (string s in fullLease.Keys) Console.WriteLine(s + " ");
+                Console.WriteLine();
+
+            }
+
             // We will send the first key of every list to delete to all other Tm's, because they can get the full lease that way
             List<string> firstKeys = new List<string>();
             foreach (FullLease fl in residual)

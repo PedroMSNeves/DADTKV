@@ -29,6 +29,8 @@ namespace DADTKV_TM.Impls
         }
         public BroadReply RDeletion(ResidualDeletionRequest request)
         {
+            Console.WriteLine("REceived new residualDeletion");
+
             return new BroadReply { Ack = store.DeleteResidual(request.FirstKeys.ToList(), request.TmName, request.Epoch) } ;
         }
     }

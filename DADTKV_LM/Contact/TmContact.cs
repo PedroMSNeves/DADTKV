@@ -26,7 +26,7 @@ namespace DADTKV_LM.Contact
         }
         public void BroadLease(int epoch, List<Request> leases)
         {
-            LeaseReply reply;
+            List<Grpc.Core.AsyncUnaryCall<LeaseReply>> reply = new List<Grpc.Core.AsyncUnaryCall<LeaseReply>>();
             LeaseBroadCastRequest request = new LeaseBroadCastRequest { Epoch = epoch }; //cria request
                                                                                          //request.Leases.AddRange(leases);
             Console.WriteLine(leases.Count);
@@ -51,13 +51,13 @@ namespace DADTKV_LM.Contact
                     tm_stubs.Add(new LeaseService.LeaseServiceClient(channel));
                 }
             }
-
             foreach (LeaseService.LeaseServiceClient stub in tm_stubs)
             {
                 Console.WriteLine(request.Leases.Count);
-                reply = stub.LeaseBroadCastAsync(request).GetAwaiter().GetResult(); // tirar isto de syncrono
+                reply.Add(stub.LeaseBroadCastAsync(request)); // tirar isto de syncrono
                 Console.WriteLine("DONE");
             }
+            //depois usar os valores do reply
         }
     }
 }
