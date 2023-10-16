@@ -29,6 +29,15 @@ namespace DADTKV_TM.Structs
             }
             return buff; 
         }
+        public List<Request> GetRequestsNow()
+        {
+            List<Request> buff;
+            lock (this)
+            {
+                buff = buffer;
+            }
+            return buff;
+        }
         public int insert(List<string> reads, List<DadIntProto> writes)
         {
             int tnumber;

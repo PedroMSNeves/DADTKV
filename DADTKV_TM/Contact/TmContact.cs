@@ -48,7 +48,9 @@ namespace DADTKV_TM.Contact
                 // propagar para todos os servers corretos
                 // provavelmente meter quando se recebe a dar broadcast again
                 // para isso possivelmente temos uma lista em cada Tm com nºtransacao, nome Tm
-                reply = stub.BroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
+                Console.WriteLine("In stubs");
+                Console.ReadKey();
+                reply = stub.BroadCastAsync(request).GetAwaiter().GetResult(); // tirar isto de syncrono
             }
             return true;
         }

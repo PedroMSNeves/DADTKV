@@ -24,6 +24,9 @@
                 ClientLogic clientLogic = argsPrep(args);
 
             string[] lines = System.IO.File.ReadAllLines(args[0]);
+            Console.WriteLine("CL");
+            foreach (string s in args) Console.WriteLine(s + " ");
+            
             foreach (string line in lines)
             {
                 string[] words = line.Split(' ');
