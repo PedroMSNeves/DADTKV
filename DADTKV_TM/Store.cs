@@ -111,7 +111,7 @@ namespace DADTKV_TM
              * Verificar todos os da lista 1 a 1 e meter como S T N
              * Verificar os que ja têm T para saber se voltam a N (e pedimos a lease por isso vai para S)
              */
-            List<Request> reqs = _reqList.GetRequests(); // podia estar fora do lock porque nao da conflito de escrita
+            List<Request> reqs = _reqList.GetRequests(); // podia estar fora do lock porque nao da conflito de escrita            
             lock (this)
             {
                 //foreach(Request r in reqs) foreach (DadIntProto key in r.Writes) Console.WriteLine(r.Transaction_number + ":" + key +":" + r.Situation);
@@ -268,14 +268,14 @@ namespace DADTKV_TM
                     List<DadIntProto> reply = new List<DadIntProto>();
 
                     // Tries to propagate
-                    int err = Request(reqs[i].Reads, reqs[i].Writes, fl, ref reply);
+                    int err = Request(reqs[i].Reads, reqs[i].Writes, fl, reqs[i].Epoch + 1, ref reply);
 
                      // Try again, only one time
-                     if (err == -2) err = Request(reqs[i].Reads, reqs[i].Writes, fl, ref reply);
+                     if (err == -2) err = Request(reqs[i].Reads, reqs[i].Writes, fl, reqs[i].Epoch + 1, ref reply);
 
                     verifyMaybes(fl,reqs,i);
 
-                    LeaseRemove(fl.Keys[0], _name, false);
+                    if(fl.End) LeaseRemove(fl.Keys[0], _name);
 
 
                     // Moves it to the pickup waiting place
@@ -324,24 +324,21 @@ namespace DADTKV_TM
         /// <param name="reply"></param>
         /// <param name="tmContact"></param>
         /// <returns></returns>
-        public int Request(List<string> reads, List<DadIntProto> writes, FullLease fl, ref List<DadIntProto> reply)
+        public int Request(List<string> reads, List<DadIntProto> writes, FullLease fl, int epoch, ref List<DadIntProto> reply)
         {
             if(writes.Count != 0)
             {
-                if (!_tmContact.BroadCastChanges(writes, _name)) return -2;
+                if (!_tmContact.BroadCastChanges(writes, _name, epoch)) return -2;
             }
             else
             {
                 if (fl.End && reads.Count != 0)
                 {
-                    if (_tmContact.DeleteResidualKeys(new List<string> { fl.Keys[0] }, _name)) // Apaga a lease em todos
-                    {
-                        LeaseRemove(fl.Keys[0], _name, false); // Apaga a lease para nos
-                    }
+                    _tmContact.DeleteResidualKeys(new List<string> { fl.Keys[0] }, _name, epoch);
                 }
             }
                 
-                foreach (string key in reads) reply.Add(new DadIntProto { Key = key, Value = _store[key] }); // Does the reads
+            foreach (string key in reads) reply.Add(new DadIntProto { Key = key, Value = _store[key] }); // Does the reads
             foreach (DadIntProto write in writes) _store[write.Key] = write.Value; // Does the writes
             return 0;
         }
@@ -353,13 +350,13 @@ namespace DADTKV_TM
         /// <param name="writes"></param>
         /// <param name="tm_name"></param>
         /// <returns></returns>
-        public bool Write(List<DadIntTmProto> writes, string tm_name)
+        public bool Write(List<DadIntTmProto> writes, string tm_name, int epoch)
         {
             lock (this)
             {
                 if (tm_name != null && writes.Count != 0)
                 {
-                    if (!LeaseRemove(writes[0].Key, tm_name, true)) return false; // Always goes well because they are all correct servers
+                    if (!LeaseRemove(writes[0].Key, tm_name, epoch)) return false; // Always goes well because they are all correct servers
                 }
                 foreach (DadIntTmProto write in writes) { _store[write.Key] = write.Value; }
                 Console.WriteLine("EnD write");
@@ -372,19 +369,11 @@ namespace DADTKV_TM
         /// <param name="firstkey"></param>
         /// <param name="tm_name"></param>
         /// <returns></returns>
-        public bool LeaseRemove(string firstkey, string tm_name,bool residual)
+        public bool LeaseRemove(string firstkey, string tm_name)
         {
-            Console.WriteLine("LEASE REMOVE");
-            foreach (FullLease ll in _fullLeases)
-            {
-                Console.Write("FL: ");
-                foreach (string s in ll.Keys) { Console.Write(s + " "); }
-                Console.WriteLine();
-            }
             FullLease fl;
             if (_leases[firstkey].TryPeek(out var lease)) fl = (FullLease)lease; // Gets FullLease
             else return false; // Theoretically never possible
-            if (!residual && fl.End == false) return true;
             // Verify all entries
             foreach (string key in fl.Keys)
             {
@@ -400,16 +389,31 @@ namespace DADTKV_TM
                 _leases[key].Dequeue(); // Removes queue entries
             }
             _fullLeases.Remove(fl); // Removes lease list entry
+            return true;
+        }
+        public bool LeaseRemove(string firstkey, string tm_name, int epoch)
+        {
+            FullLease fl;
+            while (_reqList.get_epoch() < epoch) Monitor.Wait(this);
+            if (_leases[firstkey].TryPeek(out var lease)) fl = (FullLease)lease; // Gets FullLease
+            else return false; // Theoretically never possible
 
-            Console.WriteLine("LEASE REMOVED");
-            foreach (FullLease ll in _fullLeases)
+            // Verify all entries
+            foreach (string key in fl.Keys)
             {
-                Console.Write("FL: ");
-                foreach (string s in ll.Keys) { Console.Write(s + " "); }
-                Console.WriteLine();
+                if (_leases[key].TryPeek(out var result))
+                {
+                    if (result.Tm_name != tm_name) return false; // Theoretically never possible
+                }
+                else return false; // Theoretically never possible
             }
 
-
+            // Remove all entries
+            foreach (string key in fl.Keys)
+            {
+                _leases[key].Dequeue(); // Removes queue entries
+            }
+            _fullLeases.Remove(fl); // Removes lease list entry
             return true;
         }
         /// <summary>
@@ -418,25 +422,11 @@ namespace DADTKV_TM
         /// <param name="firstKeys"></param>
         /// <param name="name"></param>
         /// <returns></returns>
-        public bool DeleteResidual(List<string> firstKeys, string name)
+        public bool DeleteResidual(List<string> firstKeys, string name, int epoch)
         {
-            Console.WriteLine("delete");
-            foreach (FullLease fl in _fullLeases)
-            {
-                Console.Write("FL: ");
-                foreach (string s in fl.Keys) { Console.Write(s + " "); }
-                Console.WriteLine();
-            }
             foreach (string key in firstKeys)
             {
-                LeaseRemove(key, name, true);
-            }
-            Console.WriteLine("deleted");
-            foreach (FullLease fl in _fullLeases)
-            {
-                Console.Write("FL: ");
-                foreach (string s in fl.Keys) { Console.Write(s + " "); }
-                Console.WriteLine();
+                LeaseRemove(key, name, epoch);
             }
             // testar ler leases para ver se apagou
             return true;
@@ -461,7 +451,6 @@ namespace DADTKV_TM
 
                 possible_execute = true;
                 DeleteResidualLeases(leases, epoch, out int numberOfSameEpoch);
-                Console.WriteLine("added residual");
 
                 foreach (FullLease fl in leases)
                 {
@@ -486,15 +475,13 @@ namespace DADTKV_TM
                     }
                     _fullLeases.Add(fl);
                 }
-                Console.WriteLine("added end");
 
                 RaiseEpochOfNewRequests(leases,epoch, numberOfSameEpoch);
-                Console.WriteLine("added raised");
 
                 _reqList.incrementEpoch();
+                Monitor.PulseAll(this);
                 //fim
-                 Console.WriteLine("added LEASES");
-                //foreach (FullLease lease in _fullLeases) foreach (string key in lease.Keys) Console.WriteLine(key + ":" + lease.End);
+                foreach (FullLease lease in _fullLeases) foreach (string key in lease.Keys) Console.WriteLine(key + ":" + lease.End);
             }
         }
 
@@ -544,7 +531,7 @@ namespace DADTKV_TM
         {
             numberOfSameEpoch = 0;
             List<FullLease> residual = new List<FullLease>();
-            foreach (FullLease fl in _fullLeases) { residual.Add(fl); }
+            foreach (FullLease fl in _fullLeases) { if(fl.Tm_name == _name) residual.Add(fl); }
 
             /* EX: We dont consider the new leases arriving
              * EpochM: 0     0    0     0        1     1     1    1         1      1
@@ -672,7 +659,7 @@ namespace DADTKV_TM
                 }
             }
             if (firstKeys.Count == 0) return;
-            if(_tmContact.DeleteResidualKeys(firstKeys, _name)) // Theoredicaly never fails
+            if(_tmContact.DeleteResidualKeys(firstKeys, _name, epoch)) // Theoredicaly never fails
             {
                 foreach (FullLease fl in residual)
                 {
@@ -680,7 +667,7 @@ namespace DADTKV_TM
                     if (fl.Intersection(newLeases))
                     {
                         // Eliminates our Lease from all the _leases queues and the _fullLease list
-                        LeaseRemove(fl.Keys[0], _name,true);
+                        LeaseRemove(fl.Keys[0], _name);
                     }
                 }
             }

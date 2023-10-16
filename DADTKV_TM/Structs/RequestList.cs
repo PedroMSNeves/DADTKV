@@ -19,6 +19,7 @@ namespace DADTKV_TM.Structs
             buffer = new List<Request>() ;
             MAX = size;
         }
+        public int get_epoch() { return _epoch; }
         public List<Request> GetRequests() 
         {
             List<Request> buff;

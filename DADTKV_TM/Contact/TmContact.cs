@@ -25,10 +25,10 @@ namespace DADTKV_TM.Contact
                 }
             }
         }
-        public bool BroadCastChanges(List<DadIntProto> writes, string name)
+        public bool BroadCastChanges(List<DadIntProto> writes, string name, int epoch)
         {
             BroadReply reply;
-            BroadRequest request = new BroadRequest { TmName = name};
+            BroadRequest request = new BroadRequest { TmName = name , Epoch = epoch };
             List<DadIntTmProto> writesTm = new List<DadIntTmProto>();
             foreach (DadIntProto tm in writes) writesTm.Add(new DadIntTmProto { Key = tm.Key, Value = tm.Value });
             request.Writes.AddRange(writesTm);
@@ -48,16 +48,16 @@ namespace DADTKV_TM.Contact
                 // propagar para todos os servers corretos
                 // provavelmente meter quando se recebe a dar broadcast again
                 // para isso possivelmente temos uma lista em cada Tm com nºtransacao, nome Tm
-                Console.WriteLine("In stubs");
-                Console.ReadKey();
+                //Console.WriteLine("In stubs");
+                //Console.ReadKey();
                 reply = stub.BroadCastAsync(request).GetAwaiter().GetResult(); // tirar isto de syncrono
             }
             return true;
         }
-        public bool DeleteResidualKeys(List<string> residualKeys , string name) 
+        public bool DeleteResidualKeys(List<string> residualKeys , string name, int epoch) 
         {
             BroadReply reply;
-            ResidualDeletionRequest residualDeletionRequest = new ResidualDeletionRequest { TmName = name };
+            ResidualDeletionRequest residualDeletionRequest = new ResidualDeletionRequest { TmName = name, Epoch = epoch };
             residualDeletionRequest.FirstKeys.AddRange(residualKeys);
             if (tm_stubs == null)
             {

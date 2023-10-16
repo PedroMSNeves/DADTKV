@@ -7,6 +7,7 @@ message DadIntTmProto {
 message BroadRequest {
 	repeated DadIntTmProto writes = 1;
 	string tm_name = 2;
+	int32 epoch = 3;
 }
 
 message BroadReply {
@@ -15,6 +16,7 @@ message BroadReply {
 message ResidualDeletionRequest {
 	repeated string firstKeys = 1;
 	string tm_name = 2;
+	int32 epoch = 3;
 }
 
 //mensagem especial para apenas eliminar leases

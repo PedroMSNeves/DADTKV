@@ -58,7 +58,7 @@ namespace DADTKV_Client_Lib
 
             try
             {
-                reply = tm.TxSubmitAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(15))).GetAwaiter().GetResult();
+                reply = tm.TxSubmitAsync(request).GetAwaiter().GetResult();
             }
             catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded || ex.StatusCode == StatusCode.Unavailable)
             {
