@@ -24,11 +24,13 @@ namespace DADTKV_LM.Contact
                 }
             }
         }
-        public void BroadLease(int epoch, List<Request> leases)
+        public bool BroadLease(int epoch, List<Request> leases)
         {
-            LeaseReply reply;
+            List<Grpc.Core.AsyncUnaryCall<LeaseReply>> replies = new List<Grpc.Core.AsyncUnaryCall<LeaseReply>>();
             LeaseBroadCastRequest request = new LeaseBroadCastRequest { Epoch = epoch }; //cria request
                                                                                          //request.Leases.AddRange(leases);
+
+            int acks = 0;
             Console.WriteLine(leases.Count);
             Console.WriteLine("sent");
             //Thread.Sleep(50000);
@@ -51,13 +53,26 @@ namespace DADTKV_LM.Contact
                     tm_stubs.Add(new LeaseService.LeaseServiceClient(channel));
                 }
             }
-
             foreach (LeaseService.LeaseServiceClient stub in tm_stubs)
             {
                 Console.WriteLine(request.Leases.Count);
-                reply = stub.LeaseBroadCastAsync(request).GetAwaiter().GetResult(); // tirar isto de syncrono
+                replies.Add(stub.LeaseBroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10)))); //fazer isto num try
                 Console.WriteLine("DONE");
             }
+            foreach (Grpc.Core.AsyncUnaryCall<LeaseReply> reply in replies)
+            {
+                try
+                {
+                    if (reply.ResponseAsync.Result.Ack) acks++;
+                }
+                catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded)
+                {
+                    Console.WriteLine("Greeting timeout.");
+                }
+            }
+            Console.Write("RESULTADO PAXOS CHEGOU AOS TMs? ");
+            Console.WriteLine(acks);   
+            return acks > (tm_stubs.Count / 2); //aqui é todos ou maioria?
         }
     }
 }

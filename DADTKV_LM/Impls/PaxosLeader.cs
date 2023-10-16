@@ -70,7 +70,7 @@ namespace DADTKV_LM.Impls
                             _data.Write_TS = _data.RoundID;//evitamos fazer muitas vezes inuteis
                                                            //eliminar os requests
 
-                            if (Other_TS > _data.Write_TS) _tmContact.BroadLease(Epoch, Others_value);
+                            if (Other_TS > _data.Write_TS) _tmContact.BroadLease(Epoch, Others_value); //ver se correu bem, se não correu bem não aumenta a epoch?
                             else _tmContact.BroadLease(Epoch, My_value);
                             _data.Write_TS = _data.RoundID;
 

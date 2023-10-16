@@ -19,7 +19,9 @@ namespace DADTKV_TM.Impls
         }
         public BroadReply BCast(BroadRequest request)
         {
-            return new BroadReply { Ack = store.Write(request.Writes.ToList(), request.TmName) };
+            Console.WriteLine("REceived new propagate");
+            foreach(DadIntTmProto dadIntTmProto in request.Writes.ToList()) Console.WriteLine(dadIntTmProto.ToString());
+            return new BroadReply { Ack = store.Write(request.Writes.ToList(), request.TmName, request.Epoch) };
         }
         public override Task<BroadReply> ResidualDeletion(ResidualDeletionRequest request, ServerCallContext context)
         {
@@ -27,7 +29,9 @@ namespace DADTKV_TM.Impls
         }
         public BroadReply RDeletion(ResidualDeletionRequest request)
         {
-            return new BroadReply { Ack = store.DeleteResidual(request.FirstKeys.ToList(), request.TmName) } ;
+            Console.WriteLine("REceived new residualDeletion");
+
+            return new BroadReply { Ack = store.DeleteResidual(request.FirstKeys.ToList(), request.TmName, request.Epoch) } ;
         }
     }
 }

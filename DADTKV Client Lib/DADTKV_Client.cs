@@ -54,9 +54,11 @@ namespace DADTKV_Client_Lib
                 tm_cursor = tm_cursor % channels.Count(); // chooses one of the servers
                 tm = new TmService.TmServiceClient(channels[tm_cursor]);
             }
+            Console.WriteLine("Transaction started " + tm_cursor + " !");
+
             try
             {
-                reply = tm.TxSubmitAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(15))).GetAwaiter().GetResult();
+                reply = tm.TxSubmitAsync(request).GetAwaiter().GetResult();
             }
             catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded || ex.StatusCode == StatusCode.Unavailable)
             {

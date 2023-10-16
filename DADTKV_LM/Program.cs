@@ -20,6 +20,7 @@ namespace DADTKV_LM
             bool tm = false;
             for (int i = 3; i < args.Length; i++)
             {
+               // Console.WriteLine(tm + ": " + args[i]);
                 if (args[i].Equals("TM")) tm = true;
                 else if (!tm) lm_urls.Add(args[i]);
                 else tm_urls.Add(args[i]);
@@ -39,7 +40,8 @@ namespace DADTKV_LM
         {
             List<string> tm_urls = new List<string>();
             List<string> lm_urls = new List<string>();
-
+            Console.WriteLine("LM");
+            foreach ( string s in args) Console.Write(s + " ");
             getUrls(args, ref tm_urls, ref lm_urls); // gets all url servers minus his
             Uri url = new Uri(args[1]); // gets his url 
 

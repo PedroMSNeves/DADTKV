@@ -1,5 +1,6 @@
 ﻿using DADTKV_TM.Impls;
 using Grpc.Core;
+using System;
 
 namespace DADTKV_TM
 {
@@ -19,10 +20,16 @@ namespace DADTKV_TM
             bool lm = false;
             for (int i = 2; i < args.Length; i++)
             {
+                //Console.WriteLine(args[i]);
                 if (args[i].Equals("LM")) lm = true;
                 else if (!lm) tm_urls.Add(args[i]);
                 else lm_urls.Add(args[i]);
             }
+            Console.WriteLine("TM");
+            foreach (string url in tm_urls) { Console.WriteLine(url); }
+            Console.WriteLine("LM");
+            foreach (string url in lm_urls) { Console.WriteLine(url); }
+
             if (!lm)
             {
                 Console.WriteLine("ERROR: Invalid number of args. No LeaseManagers provided");
@@ -39,6 +46,10 @@ namespace DADTKV_TM
             List<string> tm_urls = new List<string>();
             List<string> lm_urls = new List<string>();
             Uri url;
+
+            //Console.WriteLine("TM");
+            //foreach (string s in args) Console.Write(s + " ");
+
             getUrls(args, ref tm_urls, ref lm_urls); // gets all url servers minus his
             try
             {

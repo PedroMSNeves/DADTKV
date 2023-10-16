@@ -19,6 +19,7 @@ namespace DADTKV_TM.Structs
             buffer = new List<Request>() ;
             MAX = size;
         }
+        public int get_epoch() { return _epoch; }
         public List<Request> GetRequests() 
         {
             List<Request> buff;
@@ -28,6 +29,15 @@ namespace DADTKV_TM.Structs
                 buff = buffer;
             }
             return buff; 
+        }
+        public List<Request> GetRequestsNow()
+        {
+            List<Request> buff;
+            lock (this)
+            {
+                buff = buffer;
+            }
+            return buff;
         }
         public int insert(List<string> reads, List<DadIntProto> writes)
         {

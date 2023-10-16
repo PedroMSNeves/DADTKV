@@ -32,7 +32,7 @@ namespace DADTKV_LM.Impls
         public Promise Prep(PrepareRequest request) //returns promise if roundId >  my readTS
         {
             Promise reply;
-
+            Console.WriteLine(request.LeaderId);
             lock (_data)
             {
                 if (_data.IsLeader && request.RoundId > _data.RoundID)
@@ -64,6 +64,8 @@ namespace DADTKV_LM.Impls
         public AcceptReply Accpt(AcceptRequest request) //quandp recebe Accept e aceita, manda Accepted para todos os outros learners
         {
             AcceptReply reply = new AcceptReply();
+            Console.WriteLine(request.LeaderId);
+            foreach (LeasePaxos s in request.Leases)foreach(string key  in s.Keys) Console.WriteLine(key);
             if (request.WriteTs < _data.Read_TS) // precisa de lock
             {
                 reply.Ack = false;
@@ -112,5 +114,21 @@ namespace DADTKV_LM.Impls
             reply.Ack = true;
             return reply;
         }
+        public override Task<AcceptReply> GetLeaderAck(AckRequest request, ServerCallContext context)
+        {
+            return Task.FromResult(LeaderAck());
+        }
+        public AcceptReply LeaderAck() //returns promise if roundId >  my readTS
+        {
+            AcceptReply reply = new AcceptReply();
+
+            lock (_data)
+            {
+                if (_data.IsLeader ) reply.Ack = true;
+                else reply.Ack = false;
+            }
+            return reply;
+        }
+
     }
 }
