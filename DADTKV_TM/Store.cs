@@ -31,7 +31,7 @@ namespace DADTKV_TM
             possible_execute = false;
         }
 
-
+        public string getName() { return _name; }
         //////////////////////////////////////////////USED BY SERVERSERVICE////////////////////////////////////////////////////////////
         /// <summary>
         /// Used by the ServerService class (add new client transactions)
@@ -100,6 +100,34 @@ namespace DADTKV_TM
                 }
             }
         }
+
+        public bool fullLease (Request rq, out FullLease fl)
+        {
+            fl = null;
+            if (_leases[rq.Keys[0]].TryPeek(out var lease) && lease.Tm_name == _name)
+            {
+
+                fl = (FullLease)lease;
+                if (rq.SubGroup(fl))
+                {
+                    foreach (string key in fl.Keys)
+                    {
+                        // Verify if we have all the lease on the top
+                        if (_leases[key].TryPeek(out var l))
+                        {
+                            if (fl != (FullLease)l) return false;
+                        }
+                        else return false;
+                    }
+                }
+                else return false;
+            }
+            else return false;
+
+            return true;
+        }
+
+
         //////////////////////////////////////////////USED BY MAINTHREAD////////////////////////////////////////////////////////////
         /// <summary>
         /// Used By MainThread
@@ -129,36 +157,9 @@ namespace DADTKV_TM
                          */
                         //Verify if there is a completed lease
                         bool completed = true;
-                        FullLease fl = null;
-                        if (_leases[reqs[i].Keys[0]].TryPeek(out var lease) && lease.Tm_name == _name)
-                        {
-                            
-                            fl = (FullLease) lease;
-                            if (reqs[i].SubGroup(fl))
-                            {
-
-                                foreach (string key in fl.Keys)
-                                {
-                                    // Verify if we have all the lease on the top
-                                    if (_leases[key].TryPeek(out var l))
-                                    {
-                                        if (fl != (FullLease)l)
-                                        {
-                                            completed = false;
-                                            break;
-                                        }
-                                    }
-                                    else
-                                    {
-                                        completed = false;
-                                        break; // Theoredicaly impossible
-                                    }
-                                }
-                            }
-                            else completed = false;
-                        }
-                        else completed = false;
-                        if (completed)
+                        FullLease fl;
+                        // Enters if it has a full lease
+                        if (fullLease(reqs[i], out fl))
                         {
                             if (!maybeOnly)
                             {
@@ -216,54 +217,12 @@ namespace DADTKV_TM
                     FullLease fl;
                     /* We can use first key to get the lease from a queue,
                        because you can only be marked with Yes if you have a lease waiting for you or you have requested a lease */
-                    if (_leases[reqs[i].Keys[0]].TryPeek(out var lease) && lease.Tm_name == _name)
-                    {
-                        fl = (FullLease)lease;
-                        if (!reqs[i].SubGroup(fl))
-                        {
-                            i++;
-                            if (i >= reqs.Count) break;
-                            continue; /* If he is not a subGroup of the lease then:
-                                       * He is still waiting for is lease to arive and this is an old lease
-                                       * Or some other Transaction is waiting for some other Tm to release is key */
-                        }
-                        bool diff = false;
-                        foreach (string key in fl.Keys)
-                        {
-                            if (_leases[key].TryPeek(out var result))
-                            {
-                                if (fl != (FullLease)result) // Even if 2 leases are equal will not be a problem, because the firt T that uses it will remove the first equal lease, exemple below
-                                {
-                                    /* EX: t1<a,b> t2<b,c> t3<a,b>
-                                     * A  11 13
-                                     * B  11 12 13
-                                     * C  12
-                                     * When t3 tries to execute the lease for the T1 as already been removed
-                                     */
-                                    diff = true;
-                                    break; // Some other Transaction is waiting for some other Tm to release is key
-                                }
-                            }
-                            else
-                            {
-                                diff = true;
-                                break; // If the Queue is empty then the new leases did not arive yet
-                            }
-                        }
-                        if (diff)
-                        {
-                            i++;
-                            if (i >= reqs.Count) break;
-                            continue;
-                        }
-                    }
-                    else
+
+                    if(!fullLease(reqs[i], out fl))
                     {
                         i++;
                         if (i >= reqs.Count) break;
-                        continue;/* If the lease is not of our Tm or the queue is empty:
-                                  * The new set of leases did not arrive yet
-                                  * Or is waiting for another Tm to end is lease */
+                        continue;
                     }
                     List<DadIntProto> reply = new List<DadIntProto>();
 
@@ -328,6 +287,7 @@ namespace DADTKV_TM
         {
             if(writes.Count != 0)
             {
+                Console.WriteLine("EPOCHS: " + epoch + " " + _reqList.get_epoch());
                 if (!_tmContact.BroadCastChanges(writes, _name, epoch)) return -2;
             }
             else

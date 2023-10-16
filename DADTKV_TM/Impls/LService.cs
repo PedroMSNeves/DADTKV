@@ -28,7 +28,7 @@ namespace DADTKV_TM.Impls
                 leases.Add(new FullLease(lp.Tm,request.Epoch,lp.Keys.ToList()));
             }
             store.NewLeases(leases, request.Epoch);
-
+            //if(store.getName() == "tm2") Thread.Sleep(10000);
             return new LeaseReply { Ack = true };
         }
     }

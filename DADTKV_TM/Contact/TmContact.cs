@@ -56,8 +56,9 @@ namespace DADTKV_TM.Contact
         }
         public bool DeleteResidualKeys(List<string> residualKeys , string name, int epoch) 
         {
-            BroadReply reply;
+            List<Grpc.Core.AsyncUnaryCall<BroadReply>> replies = new List<Grpc.Core.AsyncUnaryCall<BroadReply>>();
             ResidualDeletionRequest residualDeletionRequest = new ResidualDeletionRequest { TmName = name, Epoch = epoch };
+            int acks = 0;
             residualDeletionRequest.FirstKeys.AddRange(residualKeys);
             if (tm_stubs == null)
             {
@@ -69,8 +70,15 @@ namespace DADTKV_TM.Contact
             }
             foreach (BroadCastService.BroadCastServiceClient stub in tm_stubs)
             {
-                reply = stub.ResidualDeletionAsync(residualDeletionRequest, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
+                replies.Add(stub.ResidualDeletionAsync(residualDeletionRequest)); // tirar isto de syncrono
             }
+            foreach (Grpc.Core.AsyncUnaryCall<BroadReply> reply in replies)
+            {
+                if (reply.ResponseAsync.Result.Ack) acks++;
+            }
+            Console.Write("RESULTADO PROPAGATE CHEGOU AOS TMs? ");
+            Console.WriteLine(acks);
+
             // for now returns always true
             return true;
         }
