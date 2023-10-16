@@ -61,7 +61,6 @@ namespace DADTKV_LM.Contact
             }
             foreach (Grpc.Core.AsyncUnaryCall<LeaseReply> reply in replies)
             {
-                reply.ResponseAsync.Wait();
                 if (reply.ResponseAsync.Result.Ack) acks++;
             }
             Console.Write("RESULTADO PAXOS CHEGOU AOS TMs? ");
