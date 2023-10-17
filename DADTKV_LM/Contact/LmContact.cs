@@ -38,7 +38,7 @@ namespace DADTKV_LM.Contact
                 {
                     foreach (LeasePaxos l in reply.Leases)
                     {
-                        Others_value.Add(new Request(l.Tm, l.Keys.ToList()));
+                        Others_value.Add(new Request(l.Tm, l.Keys.ToList(), l.LeaseId));
                     }
                     Other_TS = reply.WriteTs;
                 }

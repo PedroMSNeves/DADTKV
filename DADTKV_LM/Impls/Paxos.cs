@@ -49,7 +49,7 @@ namespace DADTKV_LM.Impls
                 reply = new Promise { WriteTs = _data.Write_TS, Ack = true };
                 foreach (Request r in My_value)
                 {
-                    LeasePaxos lp = new LeasePaxos { Tm = r.Tm_name };
+                    LeasePaxos lp = new LeasePaxos { Tm = r.Tm_name, LeaseId = r.Lease_ID };
                     foreach (string k in r.Keys) { lp.Keys.Add(k); }
                     reply.Leases.Add(lp);
                 }
@@ -89,7 +89,7 @@ namespace DADTKV_LM.Impls
                         reply.Ack = true;
                         foreach (LeasePaxos l in request.Leases)
                         {
-                            My_value.Add(new Request(l.Tm, l.Keys.ToList()));
+                            My_value.Add(new Request(l.Tm, l.Keys.ToList(), l.LeaseId));
                         }
                         _data.Possible_Leader = request.LeaderId;
                     }
