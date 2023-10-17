@@ -27,9 +27,10 @@ namespace DADTKV_TM.Contact
         }
         public bool BroadCastChanges(List<DadIntProto> writes, string name, int epoch)
         {
-            BroadReply reply;
-            BroadRequest request = new BroadRequest { TmName = name , Epoch = epoch };
+            List<Grpc.Core.AsyncUnaryCall<BroadReply>> replies = new List<Grpc.Core.AsyncUnaryCall<BroadReply>>();
+            BroadRequest request = new BroadRequest { TmName = name, Epoch = epoch };
             List<DadIntTmProto> writesTm = new List<DadIntTmProto>();
+            int acks = 0;
             foreach (DadIntProto tm in writes) writesTm.Add(new DadIntTmProto { Key = tm.Key, Value = tm.Value });
             request.Writes.AddRange(writesTm);
 
@@ -50,8 +51,14 @@ namespace DADTKV_TM.Contact
                 // para isso possivelmente temos uma lista em cada Tm com nºtransacao, nome Tm
                 //Console.WriteLine("In stubs");
                 //Console.ReadKey();
-                reply = stub.BroadCastAsync(request).GetAwaiter().GetResult(); // tirar isto de syncrono
+                replies.Add(stub.BroadCastAsync(request)); // tirar isto de syncrono
             }
+            foreach (Grpc.Core.AsyncUnaryCall<BroadReply> reply in replies)
+            {
+                if (reply.ResponseAsync.Result.Ack) acks++;
+            }
+            Console.Write("RESULTADO PROPAGATE CHEGOU AOS TMs? ");
+            Console.WriteLine(acks);
             return true;
         }
         public bool DeleteResidualKeys(List<string> residualKeys , string name, int epoch) 
@@ -76,7 +83,7 @@ namespace DADTKV_TM.Contact
             {
                 if (reply.ResponseAsync.Result.Ack) acks++;
             }
-            Console.Write("RESULTADO PROPAGATE CHEGOU AOS TMs? ");
+            Console.Write("RESULTADO Residual Lease CHEGOU AOS TMs? ");
             Console.WriteLine(acks);
 
             // for now returns always true

@@ -259,8 +259,14 @@ namespace DADTKV_TM
             if(writes.Count != 0)
             {
                 Console.WriteLine("EPOCHS: " + epoch + " " + _reqList.get_epoch());
-                if (close) if (!_tmContact.BroadCastChanges(writes, _name, epoch)) return -2; // possivel bug de eliminar leases noutros tms
-                else { if (!_tmContact.BroadCastChanges(writes, "_", epoch)) return -2; }// possivel bug de eliminar leases noutros tms
+                if (close)
+                {
+                    if (!_tmContact.BroadCastChanges(writes, _name, epoch)) return -2;
+                }
+                else
+                {
+                    if (!_tmContact.BroadCastChanges(writes, "_", epoch)) return -2;
+                }
             }
             else if (close && reads.Count != 0)
             {
