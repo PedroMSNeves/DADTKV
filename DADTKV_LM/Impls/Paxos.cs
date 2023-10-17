@@ -11,6 +11,7 @@ namespace DADTKV_LM.Impls
         private LeaseData _data;
         LmContact _lmcontact;
         TmContact _tmContact;
+        int epoch = -1;
 
         public Paxos(string name, LeaseData data, List<string> tm_urls, List<string> lm_urls)
         {
@@ -33,6 +34,9 @@ namespace DADTKV_LM.Impls
         {
             Promise reply;
             Console.WriteLine(request.LeaderId);
+
+            epoch = request.Epoch;
+
             lock (_data)
             {
                 if (_data.IsLeader && request.RoundId > _data.RoundID)
@@ -71,6 +75,7 @@ namespace DADTKV_LM.Impls
                 reply.Ack = false;
                 return reply;
             }
+            epoch = request.Epoch;
 
             //broadcast accept
             bool result = _lmcontact.BroadAccepted(request);
@@ -92,6 +97,8 @@ namespace DADTKV_LM.Impls
                             My_value.Add(new Request(l.Tm, l.Keys.ToList(), l.LeaseId));
                         }
                         _data.Possible_Leader = request.LeaderId;
+                        //Depois de alterar o seu valor envia resposta do Paxos para os TMs
+                        _tmContact.BroadLease(epoch, My_value);
                     }
                     else reply.Ack = false;
                 }

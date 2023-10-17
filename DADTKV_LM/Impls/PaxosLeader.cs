@@ -50,40 +50,48 @@ namespace DADTKV_LM.Impls
                         }
                     }
                 }
-                lock (this)
-                {
-                    while (_data.IsLeader)
-                    {
-                        My_value = _data.GetMyValue();
-                        while (My_value.Count == 0)
-                        {
-                            Thread.Sleep(1000);
-                            My_value = _data.GetMyValue();
-                        }
-                        Epoch = Epoch + 1; //implementar tempo
-                        while (!PrepareRequest())
-                        {
-                            _data.RoundID = Other_TS + 1;//evitamos fazer muitas vezes inuteis
-                        }
-                        if (AcceptRequest())
-                        {
-                            _data.Write_TS = _data.RoundID;//evitamos fazer muitas vezes inuteis
-                                                           //eliminar os requests
+                //ver aqui a passagem do tempo
+                //criar Timer
+                //timeSlot = new System.Timers.Timer(_time_slot); tem que receber o timeslot do Parser
+                RunPaxosInstance(); //if we are the leader => run Paxos
 
-                            if (Other_TS > _data.Write_TS) _tmContact.BroadLease(Epoch, Others_value); //ver se correu bem, se não correu bem não aumenta a epoch?
-                            else _tmContact.BroadLease(Epoch, My_value);
-                            _data.Write_TS = _data.RoundID;
-
-                        }
-                        //x em x tempo faz
-                    }
-                }
                 possible_leader = Id;
+            }
+        }
+        public void RunPaxosInstance()
+        {
+            lock (this)
+            {
+                while (_data.IsLeader)
+                {
+                    My_value = _data.GetMyValue();
+                    while (My_value.Count == 0)
+                    {
+                        Thread.Sleep(1000);
+                        My_value = _data.GetMyValue();
+                    }
+                    Epoch++;//implementar tempo
+                    while (!PrepareRequest())
+                    {
+                        _data.RoundID = Other_TS + 1;//evitamos fazer muitas vezes inuteis
+                    }
+                    if (AcceptRequest())
+                    {
+                        _data.Write_TS = _data.RoundID;//evitamos fazer muitas vezes inuteis
+                                                       //eliminar os requests
+
+                        if (Other_TS > _data.Write_TS) _tmContact.BroadLease(Epoch, Others_value); //ver se correu bem, se não correu bem não aumenta a epoch?
+                        else _tmContact.BroadLease(Epoch, My_value);
+                        _data.Write_TS = _data.RoundID;
+
+                    }
+                    //x em x tempo faz
+                }
             }
         }
         public bool PrepareRequest()
         {
-            PrepareRequest request = new PrepareRequest { RoundId = _data.IncrementRoundID() };
+            PrepareRequest request = new PrepareRequest { RoundId = _data.IncrementRoundID(), Epoch = Epoch };
             return _lmcontact.PrepareRequest(request, _data.Write_TS, Other_TS, Others_value);
         }
 

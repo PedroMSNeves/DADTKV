@@ -8,6 +8,7 @@ message LeasePaxos {
 message PrepareRequest {
 	int32 round_id = 1;
 	int32 leader_id = 2;
+	int32 epoch = 3;
 }
 
 message Promise {
@@ -19,6 +20,7 @@ message AcceptRequest {
 	int32 write_ts = 1;
 	repeated LeasePaxos leases = 2;
 	int32 leader_id = 3;
+	int32 epoch = 4;
 }
 
 message AcceptReply {
