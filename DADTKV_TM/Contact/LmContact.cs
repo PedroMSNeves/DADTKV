@@ -33,6 +33,7 @@ namespace DADTKV_TM.Contact
         {
             LeaseReply reply;
             LeaseRequest request = new LeaseRequest { Id = _name, LeaseId = leaseId }; //cria request
+            Console.WriteLine("REQUEST LEASE: " + request.ToString());  
             request.Keys.AddRange(keys);
             if(lm_stubs == null)
             {

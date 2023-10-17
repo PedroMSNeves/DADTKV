@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using DADTKV_TM.Contact;
 
 namespace DADTKV_TM.Structs
 {
@@ -11,13 +12,15 @@ namespace DADTKV_TM.Structs
         Dictionary<int, ResultOfTransaction> result;
         private int MAX;
         private int buzy = 0;
-        private int transaction_number = 0;
+        private int transaction_number = 1;
         private int _epoch = 0; // Last epoch received
-        public RequestList(int size)
+        private LmContact _lmContact;
+        public RequestList(int size, string name, List<string> lm_urls)
         {
             result = new Dictionary<int, ResultOfTransaction>();
             buffer = new List<Request>() ;
             MAX = size;
+            _lmContact = new LmContact(name, lm_urls);
         }
         public int get_epoch() { return _epoch; }
         public List<Request> GetRequests() 
@@ -39,7 +42,7 @@ namespace DADTKV_TM.Structs
             }
             return buff;
         }
-        public int insert(Request req)
+        public int insert(Request req, bool lease)
         {
             int tnumber;
             lock (this)
@@ -47,6 +50,11 @@ namespace DADTKV_TM.Structs
                 while (buzy == MAX) Monitor.Wait(this);
                 tnumber = transaction_number++;
                 req.initialize(tnumber, _epoch);
+                if (!lease)
+                {
+                    _lmContact.RequestLease(req.Keys, tnumber);
+                    req.Lease_number = tnumber;
+                }
                 buffer.Add(req);
                 buzy++;
                 Monitor.PulseAll(this);

@@ -17,16 +17,14 @@ namespace DADTKV_TM
         private bool possible_execute;
 
         private RequestList _reqList;
-        LmContact _lmcontact;
         TmContact _tmContact;
         public Store(string name, List<string> tm_urls, List<string> lm_urls)
         {
-            _reqList = new RequestList(10); // maximum of requests waiting allowed
+            _reqList = new RequestList(10,name, lm_urls); // maximum of requests waiting allowed
             _name = name;
             _store = new Dictionary<string, int>(); // Stores the DadInt data
             _leases = new Dictionary<string, Queue<Lease>>(); // Stores the leases in a Lifo associated with a key (string)
             _tmContact = new TmContact(tm_urls);
-            _lmcontact = new LmContact(name, lm_urls);
             _fullLeases = new List<FullLease>();
             possible_execute = false;
         }
@@ -59,8 +57,8 @@ namespace DADTKV_TM
                 }
                 //verificar leases 
                 req = new Request(reads, writes);
-                verifyLease(req);
-                tnum = _reqList.insert(req);
+                bool lease = verifyLease(req);
+                tnum = _reqList.insert(req,lease);
             }
             return tnum;
         }
@@ -81,24 +79,27 @@ namespace DADTKV_TM
             {
                 if (lease.End) continue;
                 fl = (FullLease)lease;
-                if (rq.SubGroup(fl))
+                if(lease.Tm_name == _name)
                 {
-                    bool found = false;
-                    Request lastrq = null;
-                    foreach (Request req in reqs)
+                    if (rq.SubGroup(fl))
                     {
-                        if (req.Lease_number == fl.Lease_number) lastrq = req;
-                    }
-                    if (lastrq == null) found = true;
-                    foreach (Request req in reqs)
-                    {
-                        if (lastrq != null && lastrq.Transaction_number == req.Transaction_number) found = true;
-                        else if (found)
+                        bool found = false;
+                        Request lastrq = null;
+                        foreach (Request req in reqs)
                         {
-                            if (fl.Intersection(req)) return -1;
+                            if (req.Lease_number == fl.Lease_number) lastrq = req;
                         }
+                        if (lastrq == null) found = true;
+                        foreach (Request req in reqs)
+                        {
+                            if (lastrq != null && lastrq.Transaction_number == req.Transaction_number) found = true;
+                            else if (found)
+                            {
+                                if (fl.Intersection(req)) return -1;
+                            }
+                        }
+                        return fl.Lease_number;
                     }
-                    return fl.Lease_number;
                 }
             }
             return -1;
@@ -145,7 +146,7 @@ namespace DADTKV_TM
 
         //////////////////////////////////////////////USED BY MAINTHREAD////////////////////////////////////////////////////////////
 
-        public void verifyLease(Request req)
+        public bool verifyLease(Request req)
         {
             //foreach(Request r in reqs) foreach (DadIntProto key in r.Writes) Console.WriteLine(r.Transaction_number + ":" + key +":" + r.Situation);
             /*
@@ -159,15 +160,15 @@ namespace DADTKV_TM
             if (lease_number != -1) 
             {
                 req.Lease_number = lease_number;
-                return;
+                return true;
             }
             lease_number = CompatibleLeaseNotArrived(req, reqs);
             if (lease_number != -1) 
             {
                 req.Lease_number = lease_number;
-                return;
+                return true;
             }
-            _lmcontact.RequestLease(req.Keys, req.Lease_number);
+            return false;
         }
 
         public bool completeLease(Request req, out FullLease fl)
