@@ -9,7 +9,7 @@
         }
         public void cycle()
         {
-            while (true) _store.Verify();
+            while (true) _store.Execute();
         }
     }
 }

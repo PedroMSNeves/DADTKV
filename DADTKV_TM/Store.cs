@@ -41,6 +41,8 @@ namespace DADTKV_TM
         /// <returns></returns>
         public int verifyAndInsertRequest(List<string> reads, List<DadIntProto> writes)
         {
+            int tnum;
+            Request req;
             lock (this) 
             {
                 foreach (string read in reads)
@@ -55,8 +57,12 @@ namespace DADTKV_TM
                         _leases[write.Key] = new Queue<Lease>();  
                     } 
                 }
+                //verificar leases 
+                req = new Request(reads, writes);
+                verifyLease(req);
+                tnum = _reqList.insert(req);
             }
-            return _reqList.insert(reads, writes);
+            return tnum;
         }
         /// <summary>
         /// Used by the ServerService class (get the result of a client transactions)
@@ -68,210 +74,178 @@ namespace DADTKV_TM
             return _reqList.getResult(tnum);
         }
 
-        public void subgroup(List<Request> reqs, int i, FullLease fl, ref bool maybeOnly)
+        public int CompatibleLease (Request rq, List<Request> reqs)
         {
-            for (int j = 0; j < i; j++)
+            FullLease fl = null;
+            foreach (Lease lease  in _leases[rq.Keys[0]])
             {
-                if (fl != null && reqs[j].SubGroup(fl)) // <x,k>S <abc>S <cd>S <x,k>T <x,d>N <x>N
-                {
-                    if (reqs[j].Situation != leaseRequested.No)
-                    {
-                        reqs[i].Situation = leaseRequested.Maybe;
-                        maybeOnly = true;
-                        break;
-                    }
-                    else reqs[i].Situation = leaseRequested.No;
-                }
-            }
-        }
-        public void subgroup(List<Request> reqs, int i, ref bool maybeOnly)
-        {
-            for (int j = 0; j < i; j++)
-            {
-                if (reqs[i].SubGroup(reqs[j])) // <x,k>S <abc>S <cd>S <x,k>T <x,d>N <x>N
-                {
-                    if (reqs[j].Situation != leaseRequested.No)
-                    {
-                        reqs[i].Situation = leaseRequested.Maybe;
-                        maybeOnly = true;
-                        break;
-                    }
-                    else reqs[i].Situation = leaseRequested.No;
-                }
-            }
-        }
-
-        public bool fullLease (Request rq, out FullLease fl)
-        {
-            fl = null;
-            if (_leases[rq.Keys[0]].TryPeek(out var lease) && lease.Tm_name == _name)
-            {
-
+                if (lease.End) continue;
                 fl = (FullLease)lease;
                 if (rq.SubGroup(fl))
+                {
+                    bool found = false;
+                    Request lastrq = null;
+                    foreach (Request req in reqs)
+                    {
+                        if (req.Lease_number == fl.Lease_number) lastrq = req;
+                    }
+                    if (lastrq == null) found = true;
+                    foreach (Request req in reqs)
+                    {
+                        if (lastrq != null && lastrq.Transaction_number == req.Transaction_number) found = true;
+                        else if (found)
+                        {
+                            if (fl.Intersection(req)) return -1;
+                        }
+                    }
+                    return fl.Lease_number;
+                }
+            }
+            return -1;
+        }//  1     2       3     2     4       5
+        /* t<A> t<A,B,C> t<D> t<A,B> t<A,C>  t<A,B>
+         A l1 l2
+         B l2
+         C
+
+       l3 A,C
+
+         */
+        public int CompatibleLeaseNotArrived(Request rq, List<Request> reqs)
+        {
+            int leaseNr = -1;
+            Request requestLease = null;
+            Request lastrq = null;
+            bool found = false;
+            foreach (Request req in reqs)
+            {
+                if (rq.SubGroup(req)) 
+                { 
+                    if(leaseNr != req.Lease_number)
+                    {
+                        leaseNr = req.Lease_number;
+                        requestLease = req;
+                    }
+                }
+                if (req.Lease_number == leaseNr) lastrq = req;
+            }
+            if (leaseNr == -1) return -1;
+            if (requestLease == null) return -1;
+
+            foreach (Request req in reqs)
+            {
+                if (lastrq != null && lastrq.Transaction_number == req.Transaction_number) found = true;
+                else if (found)
+                {
+                    if (requestLease.Intersection(req)) return -1;
+                }
+            }
+            return leaseNr;
+        }
+
+        //////////////////////////////////////////////USED BY MAINTHREAD////////////////////////////////////////////////////////////
+
+        public void verifyLease(Request req)
+        {
+            //foreach(Request r in reqs) foreach (DadIntProto key in r.Writes) Console.WriteLine(r.Transaction_number + ":" + key +":" + r.Situation);
+            /*
+             * Lease na list 
+             *  -se encontrarmos alguem (do nosso tm), se nao esta end e antes do nosso request tem intersessao com a lease e nao é subgrupo
+             *  -verificar se somos um subgrupo de alguem anterior, se sim e nao houver interssessao dessa lease com outro alguem ficamos com ela
+             *  -se nada anterior pedir lease
+             */
+            List<Request> reqs = _reqList.GetRequestsNow();
+            int lease_number = CompatibleLease(req, reqs);
+            if (lease_number != -1) 
+            {
+                req.Lease_number = lease_number;
+                return;
+            }
+            lease_number = CompatibleLeaseNotArrived(req, reqs);
+            if (lease_number != -1) 
+            {
+                req.Lease_number = lease_number;
+                return;
+            }
+            _lmcontact.RequestLease(req.Keys, req.Lease_number);
+        }
+
+        public bool completeLease(Request req, out FullLease fl)
+        {
+            fl = null;
+            if (_leases[req.Keys[0]].TryPeek(out var lease) && lease.Tm_name == _name)
+            {
+                fl = (FullLease)lease;
+                if (fl.Lease_number == req.Lease_number)
                 {
                     foreach (string key in fl.Keys)
                     {
                         // Verify if we have all the lease on the top
                         if (_leases[key].TryPeek(out var l))
                         {
-                            if (fl != (FullLease)l) return false;
+                            if (fl.Lease_number != l.Lease_number || l.Tm_name != _name) return false;
                         }
                         else return false;
                     }
+                    return true;
                 }
                 else return false;
             }
             else return false;
-
-            return true;
-        }
-
-
-        //////////////////////////////////////////////USED BY MAINTHREAD////////////////////////////////////////////////////////////
-        /// <summary>
-        /// Used By MainThread
-        /// Used to verify the requests and then categorises them in Yes,Maybe,No
-        /// </summary>
-        public void Verify()
-        {
-            /*
-             * Verificar todos os da lista 1 a 1 e meter como S T N
-             * Verificar os que ja têm T para saber se voltam a N (e pedimos a lease por isso vai para S)
-             */
-            List<Request> reqs = _reqList.GetRequests(); // podia estar fora do lock porque nao da conflito de escrita            
-            lock (this)
-            {
-                //foreach(Request r in reqs) foreach (DadIntProto key in r.Writes) Console.WriteLine(r.Transaction_number + ":" + key +":" + r.Situation);
-                bool maybeOnly = false;
-                for (int i = 0; i< reqs.Count; i++)
-                {
-                    if (reqs[i].Situation == leaseRequested.No)
-                    {
-
-                        /*
-                         * Verificar se temos a lease atualmente
-                         * Verificar se é um subgrupo de um request marcado a S
-                         * depois da veri, se ainda a N pedir se nao tiver com o maybe antes
-                         * Marca a T
-                         */
-                        FullLease fl;
-                        // Enters if it has a compleated lease
-                        if (fullLease(reqs[i], out fl))
-                        {
-                            if (!maybeOnly)
-                            {
-                                // se ha alguem que usa a lease antes de nos
-                                // if sim fica a Maybe
-                                // if nao fica a Yes se nao tiver nenhuma intersessao com outro request anterior ai fica a N  (para manter ordem total), nao ness, se houvesse intercessao ela estaria marcada para end e fecharia quando acabasse ou era residual e foi apagada
-                                reqs[i].Situation = leaseRequested.Yes;
-                                subgroup(reqs, i, fl, ref maybeOnly);
-                                possible_execute = true;
-                                continue;
-                            }
-                            else
-                            {
-                                // to have MAYBE TRUE we can store all maybe keys and see if we intersect some if not, we can turn true 
-                                // right now we cant have Maybe true, only maybe maybe or maybe no
-                                reqs[i].Situation = leaseRequested.Maybe;
-                                continue;
-                            }
-                        }
-
-                        // vai ter subreposicao com parte da veri de cima, mas tem casos diff, os que ainda nao temos a lease, mas ja pedimos
-                        subgroup(reqs, i, ref maybeOnly);
-
-                        // to have MAYBE TRUE we can store all maybe keys and see if we intersect some if not, we can turn true 
-                        // right now we cant have Maybe true, only maybe maybe or maybe no
-                        if (!maybeOnly && reqs[i].Situation == leaseRequested.No)
-                        {
-                            _lmcontact.RequestLease(reqs[i].Keys);
-                            reqs[i].Situation = leaseRequested.Yes;
-                            possible_execute = true;
-                        }                    
-                    }
-                    else if (reqs[i].Situation == leaseRequested.Maybe) maybeOnly = true;
-                }
-                if (possible_execute) Execute(ref reqs);
-            }
         }
         /// <summary>
         /// Tries to execute the requests marked with Yes
         /// </summary>
         /// <param name="reqs"></param>
-        public void Execute(ref List<Request> reqs)
+        public void Execute()
         {
             int i = 0;
             //possible_execute = false;
-            
-            while (true)
+            List<Request> reqs = _reqList.GetRequests(); // podia estar fora do lock porque nao da conflito de escrita
+            lock (this)
             {
-
-                // If we arrive at a request marked with Maybe/No 
-                if (reqs[i].Situation != leaseRequested.Yes) break;
-                else // Request marked with Yes
+                while (true)
                 {
                     FullLease fl;
+                    List<DadIntProto> reply = new List<DadIntProto>();
                     /* We can use first key to get the lease from a queue,
                        because you can only be marked with Yes if you have a lease waiting for you or you have requested a lease */
 
-                    if(!fullLease(reqs[i], out fl))
+                    if (!completeLease(reqs[i], out fl))
                     {
-                        i++;
+                        /*i++;
                         if (i >= reqs.Count) break;
-                        continue;
+                        continue;*/
+                        break;
                     }
-                    List<DadIntProto> reply = new List<DadIntProto>();
 
+                    bool close = false;
+                    if (fl.End)
+                    {
+                        close = true;
+                        for (int j = i+1; j < reqs.Count; j++)
+                        {
+                            if (reqs[j].Lease_number == reqs[i].Lease_number)
+                            {
+                                close = false;
+                                break;
+                            }
+                        }  
+                    }
                     // Tries to propagate
-                    int err = Request(reqs[i].Reads, reqs[i].Writes, fl, reqs[i].Epoch + 1, ref reply);
+                    int err = Request(reqs[i].Reads, reqs[i].Writes, fl, reqs[i].Epoch + 1, ref reply, close);
 
-                     // Try again, only one time
-                     if (err == -2) err = Request(reqs[i].Reads, reqs[i].Writes, fl, reqs[i].Epoch + 1, ref reply);
-
-                    verifyMaybes(fl,reqs,i);
-
-                    if(fl.End) LeaseRemove(fl.Keys[0], _name);
-
+                    if (close) LeaseRemove(fl.Keys[0], _name);
 
                     // Moves it to the pickup waiting place
                     _reqList.move(reqs[i].Transaction_number, reply, err);
 
                     // Remove from the request list
                     _reqList.remove(i);
+                    if (i >= reqs.Count) break;
                 }
-                i++;
-                if (i >= reqs.Count)  break;
             }
         }
-        public void verifyMaybes(FullLease fl, List<Request> reqs, int i)
-        {
-            //se for para terminar as outras ficam a nao
-            if (fl.End)
-            {
-                for(int j  = i; j < reqs.Count; j++)
-                {
-                    if (reqs[j].SubGroup(fl)) reqs[j].Situation = leaseRequested.No;
-                }
-                return;
-            }
-            //foreach(Request r in reqs) foreach (DadIntProto key in r.Writes) Console.WriteLine(r.Transaction_number + ":" + key +":" + r.Situation);
-            
-            //se nao for para apagar mete sim na proxima
-            for (int j = i+1; j < reqs.Count; j++)
-            {
-                if (reqs[j].SubGroup(fl))
-                {
-                    //maybe verificar intercessoes entre i+1 e j
-
-                    reqs[j].Situation = leaseRequested.Yes;
-                    //foreach (Request r in reqs) foreach (DadIntProto key in r.Writes) Console.WriteLine(r.Transaction_number + ":" + key + ":" + r.Situation);
-                    return;
-                }
-            }
-
-        }
-
         /// <summary>
         /// Executes a request per say and broadcast the changes
         /// </summary>
@@ -280,20 +254,17 @@ namespace DADTKV_TM
         /// <param name="reply"></param>
         /// <param name="tmContact"></param>
         /// <returns></returns>
-        public int Request(List<string> reads, List<DadIntProto> writes, FullLease fl, int epoch, ref List<DadIntProto> reply)
+        public int Request(List<string> reads, List<DadIntProto> writes, FullLease fl, int epoch, ref List<DadIntProto> reply, bool close)
         {
             if(writes.Count != 0)
             {
                 Console.WriteLine("EPOCHS: " + epoch + " " + _reqList.get_epoch());
-                if (fl.End) if (!_tmContact.BroadCastChanges(writes, _name, epoch)) return -2; // possivel bug de eliminar leases noutros tms
+                if (close) if (!_tmContact.BroadCastChanges(writes, _name, epoch)) return -2; // possivel bug de eliminar leases noutros tms
                 else { if (!_tmContact.BroadCastChanges(writes, "_", epoch)) return -2; }// possivel bug de eliminar leases noutros tms
             }
-            else
+            else if (close && reads.Count != 0)
             {
-                if (fl.End && reads.Count != 0)
-                {
-                    _tmContact.DeleteResidualKeys(new List<string> { fl.Keys[0] }, _name, epoch);
-                }
+                _tmContact.DeleteResidualKeys(new List<string> { fl.Keys[0] }, _name, epoch);
             }
                 
             foreach (string key in reads) reply.Add(new DadIntProto { Key = key, Value = _store[key] }); // Does the reads
@@ -464,7 +435,7 @@ namespace DADTKV_TM
                 *         <A,B,C> <C,D> <X> <X,K>    <A,B,C> <C,D>
                 *            2º epoch               |  3º epoch 
                 */
-                if (rq.Situation == leaseRequested.Yes && rq.Epoch == epoch - 1)
+                if (rq.Epoch == epoch - 1)
                 {
                     if (count != 0) count--;
                     else
@@ -475,13 +446,7 @@ namespace DADTKV_TM
                         rq.Epoch++;
                     }
                 }
-                else if (rq.Situation != leaseRequested.Yes && rq.Epoch == epoch - 1) // All requests not marked with Yes will increase their epoch
-                {
-                    rq.Epoch++;
-                }
             }
-
-
         }
 
 
@@ -540,75 +505,73 @@ namespace DADTKV_TM
             {
                 foreach (Request rq in _reqList.GetRequestsNow())
                 {
-                    if (rq.Situation == leaseRequested.Yes)
-                    {
                         // We test if the epoch number is smaller (<= epoch-2) than our new epoch number
-                        if (epoch != 1 && rq.Epoch < epoch-1)
+                    if (epoch != 1 && rq.Epoch < epoch-1)
+                    {
+                        /* Only looks into the epoch-2 requests left
+                         * EpochM: 0     0    0     0    
+                         *       <A,I> <A,B> <P> <A,B,K> 
+                         *          1º epoch
+                         *      P   12
+                         *      C   14      
+                         *      D   14
+                         *      X   15
+                         */
+                        // Is the only possible request to use that list, because we already removed all leases that had intersections with someone
+                        if (rq.SubGroup(fl))
                         {
-                            /* Only looks into the epoch-2 requests left
-                             * EpochM: 0     0    0     0    
-                             *       <A,I> <A,B> <P> <A,B,K> 
-                             *          1º epoch
-                             *      P   12
+                            /* From the remaining leases we remove the ones that have a request using them
+                             * EpochM: 0     0    0     0   
+                             *       <A,I> <A,B> <P> <A,B,K>
+                             *          1º epoch  
                              *      C   14      
-                             *      D   14
+                             *      D   14  
                              *      X   15
                              */
-                            // Is the only possible request to use that list, because we already removed all leases that had intersections with someone
-                            if (rq.SubGroup(fl))
-                            {
-                                /* From the remaining leases we remove the ones that have a request using them
-                                 * EpochM: 0     0    0     0   
-                                 *       <A,I> <A,B> <P> <A,B,K>
-                                 *          1º epoch  
-                                 *      C   14      
-                                 *      D   14  
-                                 *      X   15
-                                 */
 
-                                // If someone will use it it's not residual then remove (in this case the lease for P)
-                                
-                                residual.Remove(fl);
-                            }
+                            // If someone will use it it's not residual then remove (in this case the lease for P)
+                            
+                            residual.Remove(fl);
                         }
-                        else if (rq.Epoch == epoch - 1)
+                    }
+                    else if (rq.Epoch == epoch - 1)
+                    {
+                        if(epochRequest == null) epochRequest = new List<Request>();
+                        epochRequest.Add(rq);
+                        /* Only looks into the epoch-1 requests left
+                         * EpochM:    1      1    1    1       1      1
+                         *         <A,B,C> <C,D> <X> <X,K>  <A,B,C> <C,D>
+                         *          1º epoch
+                         *      C   14      
+                         *      D   14  
+                         *      X   15
+                         */
+                        
+                        if (rq.SubGroup(fl))
                         {
-                            if(epochRequest == null) epochRequest = new List<Request>();
-                            epochRequest.Add(rq);
-                            /* Only looks into the epoch-1 requests left
+                            bool intersect = false;
+                            foreach (Request rq2 in epochRequest)
+                            {
+                                if (fl.Intersection(rq2)) intersect = true;
+                            }
+                            if (!intersect)
+                            {
+                                residual.Remove(fl);
+                                // Number of requests that have epochNumber -1 increases (used for calculating our epochs received)
+                                numberOfSameEpoch++;
+                            }
+                            /* We remove any lease that will be used and does not have a intersection behind (from another epoch-1 request)
                              * EpochM:    1      1    1    1       1      1
                              *         <A,B,C> <C,D> <X> <X,K>  <A,B,C> <C,D>
                              *          1º epoch
                              *      C   14      
                              *      D   14  
-                             *      X   15
+                             *      
+                             *      Lease from Tm1 lease 4 is residual and will be terminated with a broadcast
                              */
-                            
-                            if (rq.SubGroup(fl))
-                            {
-                                bool intersect = false;
-                                foreach (Request rq2 in epochRequest)
-                                {
-                                    if (fl.Intersection(rq2)) intersect = true;
-                                }
-                                if (!intersect)
-                                {
-                                    residual.Remove(fl);
-                                    // Number of requests that have epochNumber -1 increases (used for calculating our epochs received)
-                                    numberOfSameEpoch++;
-                                }
-                                /* We remove any lease that will be used and does not have a intersection behind (from another epoch-1 request)
-                                 * EpochM:    1      1    1    1       1      1
-                                 *         <A,B,C> <C,D> <X> <X,K>  <A,B,C> <C,D>
-                                 *          1º epoch
-                                 *      C   14      
-                                 *      D   14  
-                                 *      
-                                 *      Lease from Tm1 lease 4 is residual and will be terminated with a broadcast
-                                 */
-                            }
                         }
                     }
+                    
                 }
             }
             Console.WriteLine("RESIDUAL END");

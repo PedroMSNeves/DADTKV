@@ -39,14 +39,15 @@ namespace DADTKV_TM.Structs
             }
             return buff;
         }
-        public int insert(List<string> reads, List<DadIntProto> writes)
+        public int insert(Request req)
         {
             int tnumber;
             lock (this)
             {
                 while (buzy == MAX) Monitor.Wait(this);
                 tnumber = transaction_number++;
-                buffer.Add(new Request(reads, writes, tnumber, _epoch));
+                req.initialize(tnumber, _epoch);
+                buffer.Add(req);
                 buzy++;
                 Monitor.PulseAll(this);
             }

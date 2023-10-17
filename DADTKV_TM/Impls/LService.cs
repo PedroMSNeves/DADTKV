@@ -25,7 +25,7 @@ namespace DADTKV_TM.Impls
             foreach (LeaseProto lp in request.Leases)
             {
                 Console.WriteLine(lp.ToString());
-                leases.Add(new FullLease(lp.Tm,request.Epoch,lp.Keys.ToList()));
+                leases.Add(new FullLease(lp.Tm,request.Epoch,lp.Keys.ToList(), lp.LeaseId));
             }
             store.NewLeases(leases, request.Epoch);
             //if(store.getName() == "tm2") Thread.Sleep(10000);
