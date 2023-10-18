@@ -270,32 +270,11 @@ namespace DADTKV_TM
                         break;
                     }
 
-                    bool close = false;
-                    // Sees if we have to close the lease
-                    if (fl.End)
-                    {
-                        close = true;
-                        for (int j = i+1; j < reqs.Count; j++)
-                        {
-                            // If someone will still use this lease then we dont close it
-                            if (reqs[j].Lease_number == reqs[i].Lease_number)
-                            {
-                                close = false;
-                                break;
-                            }
-                        }  
-                    }
                     // Tries to propagate
                     Console.WriteLine("Request");
 
-                    int err = Request(reqs[i].Reads, reqs[i].Writes, fl, reqs[i].Epoch + 1, ref reply, close);
+                    int err = Request(reqs[i].Reads, reqs[i].Writes, fl, reqs[i].Epoch + 1, ref reply);
                     Console.WriteLine("Request END");
-
-                    // Removed the lease if needed
-                    Console.WriteLine("LeaseRemove");
-
-                    if (close) LeaseRemove(fl.Keys[0], _name);
-                    Console.WriteLine("LeaseRemove END");
 
                     // Moves it to the pickup waiting place
                     Console.WriteLine("Move");
@@ -325,31 +304,15 @@ namespace DADTKV_TM
         /// <param name="reply"></param>
         /// <param name="close"></param>
         /// <returns></returns>
-        public int Request(List<string> reads, List<DadIntProto> writes, FullLease fl, int epoch, ref List<DadIntProto> reply, bool close)
+        public int Request(List<string> reads, List<DadIntProto> writes, FullLease fl, int epoch, ref List<DadIntProto> reply)
         {
             // If we have writes we use them to identify the lease to close (if needed)
             if(writes.Count != 0)
             {
                 // If lease is to close, we send the name, if not we send "_"
                 Console.WriteLine("BroadCastChanges");
-                if (close)
-                {
-                    
-                    if (!_tmContact.BroadCastChanges(writes, _name, epoch, this)) return -2;
-                }
-                else
-                {
-                    if (!_tmContact.BroadCastChanges(writes, "_", epoch, this)) return -2;
-                }
+                if (!_tmContact.BroadCastChanges(writes, _name, epoch, this)) return -2;
                 Console.WriteLine("BroadCastChanges END");
-
-            }
-            else if (close && reads.Count != 0)
-            {
-                // We send the first read key to end the lease (if needed)
-                Console.WriteLine("DeleteResidualKeys");
-                _tmContact.DeleteResidualKeys(new List<string> { fl.Keys[0] }, _name, epoch, this);
-                Console.WriteLine("DeleteResidualKeys END");
 
             }
             Console.WriteLine("Reads");
@@ -364,6 +327,7 @@ namespace DADTKV_TM
             Console.WriteLine("Writes");
             foreach (DadIntProto write in writes) _store[write.Key] = write.Value; // Does the writes
             Console.WriteLine("Writes END");
+            possibleResiduals = true;
 
             return 0;
         }
@@ -410,12 +374,6 @@ namespace DADTKV_TM
 
             lock (this)
             {
-                if (tm_name != "_")
-                {
-                    Console.WriteLine("LeaseRemove");
-                    if (!LeaseRemove(writes[0].Key, tm_name, epoch)) return false; // Always goes well because they are all correct servers
-                    Console.WriteLine("LeaseRemove END");
-                }
                 foreach (DadIntTmProto write in writes) { _store[write.Key] = write.Value; }
             }
             Console.WriteLine("Write END");
@@ -560,63 +518,6 @@ namespace DADTKV_TM
              *       <A,I> <A,B> <P> <A,B,K>  <A,B,C> <C,D> <X> <X,K>    <A,B,C> <C,D>
              *          1º epoch             | 2º epoch               |  3º epoch 
              */
-        }
-
-
-        private void DeleteResidualLeases(int epoch)
-        {
-            // refazer funcao
-            /*
-             * Lista de todas as leases
-             *  -para cada uma delas verificar se estão marcadas para end (se sao nossas) e se fazem intersessao com as novas 
-             */
-            List<FullLease> residual = new List<FullLease>();
-            foreach (FullLease fl in _fullLeases) { if(fl.Tm_name == _name) residual.Add(fl); }
-            if (residual.Count == 0) return;
-
-            foreach (FullLease fullLease in residual)
-            {
-                Console.Write("FL "+ fullLease.Tm_name + ": ");
-                foreach (string s in fullLease.Keys) Console.Write(s + " ");
-                Console.WriteLine();
-            }
-            // Removes all leases from residual list in queues marked to end, because if they have a lease to end before they execute, they didnt execute yet
-            
-            foreach (string key in _leases.Keys) 
-            {
-                bool end = false;
-                foreach(Lease l in _leases[key]) 
-                {
-                    if(!l.End) residual.Remove((FullLease)l);
-                    else if (l.End && !end) end = true;
-                    else if (end) residual.Remove((FullLease)l);
-                }
-            }
-            int i = 0;
-            if (residual.Count == 0) return;
-
-            while (true)
-            {
-                bool used = false;
-                foreach (Request rq in _reqList.GetRequestsNow())
-                {
-                    if (residual[i].Lease_number == rq.Lease_number)
-                    {
-                        used = true;
-                        break;
-                    }
-                }
-                if (used) residual.Remove((FullLease)residual[i]);
-                else i++;
-                if(i >= residual.Count) break;
-            }
-            foreach (FullLease fullLease in residual)
-            {
-                Console.Write("FL " + fullLease.Tm_name + ": ");
-                foreach (string s in fullLease.Keys) Console.Write(s + " ");
-                Console.WriteLine();
-            }
-            //residualLeases[epoch-1] = (residual);  
         }
         public void removeResidual()
         {
