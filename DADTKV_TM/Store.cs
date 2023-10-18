@@ -42,7 +42,11 @@ namespace DADTKV_TM
                 // Verifies if it has valid reads and writes
                 foreach (string read in reads)
                 {
-                    if (!_store.ContainsKey(read)) { return -1; } // maybe meter timeout depois renbenta
+                    // A non existing read returns a null value
+                    if (!_leases.ContainsKey(read)) 
+                    {
+                        _leases[read] = new Queue<Lease>();
+                    } 
                 }
                 foreach (DadIntProto write in writes)
                 {
@@ -302,7 +306,13 @@ namespace DADTKV_TM
                 _tmContact.DeleteResidualKeys(new List<string> { fl.Keys[0] }, _name, epoch);
             }
                 
-            foreach (string key in reads) reply.Add(new DadIntProto { Key = key, Value = _store[key] }); // Does the reads
+            foreach (string key in reads)
+            { 
+                if(!_store.ContainsKey(key)) reply.Add(new DadIntProto { Key = key, Value = 0, InvalidRead = true }); // Does the reads
+                else reply.Add(new DadIntProto { Key = key, Value = _store[key], InvalidRead = false }); // Does the reads
+
+            }
+
             foreach (DadIntProto write in writes) _store[write.Key] = write.Value; // Does the writes
             return 0;
         }

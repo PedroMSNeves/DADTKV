@@ -67,7 +67,10 @@ namespace DADTKV_Client_Lib
                 tm = new TmService.TmServiceClient(channels[tm_cursor]); // Changes the server to contact in the next request
                 return new List<DadInt>();
             }
-            foreach (DadIntProto dad in reply.Reads) { result.Add(new DadInt(dad.Key, dad.Value)); }
+            foreach (DadIntProto dad in reply.Reads) 
+            {
+                result.Add(new DadInt(dad.Key, dad.Value, dad.InvalidRead));
+            }
             Console.WriteLine("Transaction succeded!");
             return result;
         }
@@ -83,14 +86,27 @@ namespace DADTKV_Client_Lib
     /// </summary>
     public struct DadInt
     {
+        public DadInt(string key, int val, bool inValidRead)
+        {
+            Key = key;
+            Val = val;
+            InValidRead = inValidRead;
+        }
         public DadInt(string key, int val)
         {
             Key = key;
             Val = val;
+            InValidRead = true;
         }
         public string Key { get; }
         public int Val { get; }
+        public bool InValidRead { set;  get; }
 
-        public override string ToString() => $"({Key}, {Val})";
+        public override string ToString()
+        {
+            if (InValidRead) return $"({Key})";
+            return $"({Key}, {Val})";
+        }
+
     }
 }
