@@ -19,7 +19,6 @@ namespace DADTKV_TM.Impls
         }
         public BroadReply BCast(BroadRequest request)
         {
-            Console.WriteLine("REceived new propagate");
             foreach(DadIntTmProto dadIntTmProto in request.Writes.ToList()) Console.WriteLine(dadIntTmProto.ToString());
             return new BroadReply { Ack = store.Write(request.Writes.ToList(), request.TmName, request.Epoch) };
         }
