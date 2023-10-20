@@ -48,7 +48,6 @@ namespace DADTKV_LM.Contact
             values.Add(0);//ack counter
             values.Add(0);//nack counter
 
-
             if (lm_stubs == null)
             {
                 lm_stubs = new List<PaxosService.PaxosServiceClient>();
@@ -62,7 +61,6 @@ namespace DADTKV_LM.Contact
                 Thread t = new Thread(() => { sendAccepted(ref values, stub, request); });
                 t.Start();
             }
-            Console.WriteLine("BROADCAST ACCEPTED");
             lock (this)
             {
                 while (!(values[0] + 1 >= (lm_stubs.Count + 1) / 2 || values[1] >= (lm_stubs.Count + 1) / 2)) Monitor.Wait(this);
@@ -100,7 +98,7 @@ namespace DADTKV_LM.Contact
                 }
                 catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded)
                 {
-                    Console.WriteLine("Greeting timeout.");
+                    Console.WriteLine("Could not contact LM");
                 }
             }
             Console.WriteLine("ACKS :" + acks);

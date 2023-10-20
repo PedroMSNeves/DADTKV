@@ -20,7 +20,9 @@ namespace DADTKV_LM
             read_ts = new Dictionary<int, int>();
             write_ts = new Dictionary<int, int>();
             RoundID = 0;
+            Epoch = 0;
         }
+        public int Epoch { get; set; }
         public int GetReadTS(int epoch) 
         {
             if (read_ts.ContainsKey(epoch)) return read_ts[epoch];

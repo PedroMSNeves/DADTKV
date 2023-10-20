@@ -3,7 +3,6 @@ using Grpc.Core;
 using DADTKV_LM.Structs;
 using DADTKV_LM.Contact;
 using Grpc.Net.Client;
-using System.Xml.Linq;
 
 namespace DADTKV_LM.Impls
 {
@@ -23,7 +22,6 @@ namespace DADTKV_LM.Impls
             _data = data;
             Id = id;
 
-            //Epoch = 0; //mudar este, provavelmente vai sair daqui
             _tmContact = new TmContact(tm_urls);
             _lmcontact = new LmContact(name, lm_urls);
 
@@ -33,10 +31,7 @@ namespace DADTKV_LM.Impls
 
         }
         public string Name { get; }
-        public List<Request> GetMyValue(int epoch)
-        {
-            return my_value[epoch];
-        }
+        public List<Request> GetMyValue(int epoch){ return my_value[epoch]; }
         public void SetMyValue(int epoch, List<Request> req)
         {
             if (my_value.ContainsKey(epoch))
@@ -49,10 +44,7 @@ namespace DADTKV_LM.Impls
                 my_value.Add(epoch, req);
             }
         }
-        public List<Request> GetOtherValue(int epoch)
-        {
-            return other_value[epoch];
-        }
+        public List<Request> GetOtherValue(int epoch) { return other_value[epoch]; }
         public void SetOtherValue(int epoch, List<Request> req)
         {
             if (other_value.ContainsKey(epoch))
@@ -70,23 +62,23 @@ namespace DADTKV_LM.Impls
             if (other_TS.ContainsKey(epoch)) return other_TS[epoch];
             else return 0;
         }
-        public void SetOtherTS(int epoch, int val)
-        {
-            other_TS[epoch] = val;
-        }
+        public void SetOtherTS(int epoch, int val) { other_TS[epoch] = val; }
         public int Id { get; set; }
 
+        /// <summary>
+        /// LMs wait until they are leaders
+        /// </summary>
         public void cycle(int timeSlotDuration, int numTimeSlots)
         {
-            int epoch = 1;
+            _data.Epoch = 1;
             bool ack = true;
             int possible_leader = -1;
 
-            while (true)
+            while (true) //wait until you are the leader
             {
                 Console.WriteLine("Possible Leader: " + possible_leader);
                 Console.WriteLine("Id: " + Id);
-                while (Id != possible_leader + 1 && ack)
+                while (Id != possible_leader + 1 && ack) //if we are the next leader
                 {
                     Thread.Sleep(5000); //dorme 5 sec e depois manda mensagem
                     lock (_data)
@@ -94,24 +86,21 @@ namespace DADTKV_LM.Impls
                         possible_leader = _data.Possible_Leader;
                         if (Id == possible_leader + 1) // depois ver tambem se é o seguinte no bitmap que esteja vivo
                         {
-                            ack = _lmcontact.getLeaderAck(_data.Possible_Leader);
+                            ack = _lmcontact.getLeaderAck(_data.Possible_Leader); //Contact the leader to see if he is alive
                         }
                     }
                 }
-                if (_data.IsLeader) 
-                {
-                    Console.WriteLine("times: " + numTimeSlots);
-                    for (int i = 0; i < numTimeSlots; i++)
-                    {
-                        Console.WriteLine("New Paxos Instance");
-                        Thread t = new Thread(() => RunPaxosInstance(epoch));
-                        t.Start();
-                        Thread.Sleep(timeSlotDuration);
-                        epoch++;
-                        _data.RoundID++;
-                    }
-                }
+                if (_data.IsLeader) break;
                 else Thread.Sleep(100000);
+            }
+            for (int i = 0; i < numTimeSlots; i++)
+            {
+                Console.WriteLine("New Paxos Instance");
+                Thread t = new Thread(() => RunPaxosInstance(_data.Epoch));
+                t.Start();
+                Thread.Sleep(timeSlotDuration);
+                _data.Epoch++;
+                _data.RoundID++;
             }
         }
         public void RunPaxosInstance(int epoch)
@@ -119,13 +108,13 @@ namespace DADTKV_LM.Impls
             int round_id;
             lock (this)
             {
-                Console.WriteLine("IM THE LEADER");
                 SetMyValue(epoch, _data.GetMyValue());
 
                 while (GetMyValue(epoch).Count == 0) //nao ter este while e mandar o paxos vazio?
                 {
                     Thread.Sleep(1000);
                     SetMyValue(epoch, _data.GetMyValue());
+                    Console.WriteLine("QUERO MAIS PEDIDOS");
                 }
 
                 while (!PrepareRequest(epoch))
@@ -135,25 +124,22 @@ namespace DADTKV_LM.Impls
                 round_id = _data.RoundID;
             }
 
-                Console.WriteLine("REQUEST PREPARED");
+                Console.WriteLine("PREPARE DONE");
                 if (AcceptRequest(epoch, round_id))
                 {
-                    Console.WriteLine("REQUEST ACCEPTED");
+                    Console.WriteLine("ACCEPT DONE");
                     _data.SetWriteTS(epoch, round_id);
-                    //_data.Write_TS = _data.RoundID;//evitamos fazer muitas vezes inuteis
-                    //eliminar os requests
 
                     if (other_TS[epoch] > _data.GetWriteTS(epoch))
                     {
                         _tmContact.BroadLease(epoch, other_value[epoch]); //ver se correu bem, se não correu bem não aumenta a epoch?
                     }
                     else _tmContact.BroadLease(epoch, my_value[epoch]);
-                    Console.WriteLine("REQUEST BROADCASTED");
+                    Console.WriteLine("BROADCASTED");
                     _data.SetWriteTS(epoch, round_id);
 
                 }
             _data.RoundID++;
-           // }
         }
         public bool PrepareRequest(int epoch)
         {
