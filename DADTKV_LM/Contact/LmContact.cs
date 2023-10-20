@@ -92,7 +92,7 @@ namespace DADTKV_LM.Contact
             {
                 reply = lm_stubs[possible_leader].GetLeaderAckAsync(new AckRequest(), new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();
             }
-            catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded)
+            catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded || ex.StatusCode == StatusCode.Unavailable)
             {
                 Console.WriteLine("Leader probably dead");
                 reply = new AcceptReply { Ack = false };

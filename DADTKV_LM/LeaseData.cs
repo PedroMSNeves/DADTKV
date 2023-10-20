@@ -12,7 +12,6 @@ namespace DADTKV_LM
         List<Request> _requests = new List<Request>(); //requests received from TMs
         private Dictionary<int, int> read_ts;
         private Dictionary<int, int> write_ts;
-        private Dictionary<int, int> round_id;
 
         public LeaseData(bool leader)
         {

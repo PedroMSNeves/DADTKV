@@ -95,7 +95,7 @@ namespace DADTKV_LM.Impls
         {
             lock (this)
             {
-                while (_data.IsLeader)
+                if (_data.IsLeader)
                 {
                     SetMyValue(epoch, _data.GetMyValue());
 
