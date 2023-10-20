@@ -34,6 +34,7 @@ namespace DADTKV_LM.Impls
         {
             Promise reply;
             Console.WriteLine(request.LeaderId);
+            Console.WriteLine(request.Epoch);
 
             lock (_data)
             {
@@ -52,7 +53,7 @@ namespace DADTKV_LM.Impls
                 _data.SetReadTS(epoch, request.RoundId);
                 _data.Possible_Leader = request.LeaderId;
 
-                reply = new Promise { WriteTs = _data.GetWriteTS(epoch), Ack = true };
+                reply = new Promise { WriteTs = _data.GetWriteTS(epoch), Ack = true, Epoch = epoch };
 
                 foreach (Request r in My_value)
                 {
@@ -70,7 +71,7 @@ namespace DADTKV_LM.Impls
         }
         public AcceptReply Accpt(AcceptRequest request) //quandp recebe Accept e aceita, manda Accepted para todos os outros learners
         {
-            AcceptReply reply = new AcceptReply();
+            AcceptReply reply = new AcceptReply { Epoch = request.Epoch };
             Console.WriteLine(request.LeaderId);
             foreach (LeasePaxos s in request.Leases)foreach(string key  in s.Keys) Console.WriteLine(key);
             if (request.WriteTs < _data.GetReadTS(request.Epoch)) // precisa de lock
@@ -116,7 +117,7 @@ namespace DADTKV_LM.Impls
         }
         public AcceptReply Accpted(AcceptRequest request) //quandp recebe Accept e aceita, manda Accepted para todos os outros learners
         {
-            AcceptReply reply = new AcceptReply();
+            AcceptReply reply = new AcceptReply { Epoch = request.Epoch };
             if (request.WriteTs != _data.GetReadTS(request.Epoch))
             {
                 reply.Ack = false;

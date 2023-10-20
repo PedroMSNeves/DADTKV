@@ -22,7 +22,7 @@ namespace DADTKV_LM.Impls
             _data = data;
             Id = id;
 
-            Epoch = 0; //mudar este, provavelmente vai sair daqui
+            //Epoch = 0; //mudar este, provavelmente vai sair daqui
             _tmContact = new TmContact(tm_urls);
             _lmcontact = new LmContact(name, lm_urls);
 
@@ -59,7 +59,6 @@ namespace DADTKV_LM.Impls
             other_TS[epoch] = val;
         }
         public int Id { get; set; }
-        public int Epoch { get; set; }
 
         public void cycle(int timeSlotDuration, int numTimeSlots)
         {
@@ -104,7 +103,7 @@ namespace DADTKV_LM.Impls
                         Thread.Sleep(1000);
                         SetMyValue(epoch, _data.GetMyValue());
                     }
-                    Epoch++;//implementar tempo, isto vai sair daqui
+
                     while (!PrepareRequest(epoch))
                     {
                         _data.RoundID = GetOtherTS(epoch) + 1;//evitamos fazer muitas vezes inuteis
@@ -115,18 +114,20 @@ namespace DADTKV_LM.Impls
                         //_data.Write_TS = _data.RoundID;//evitamos fazer muitas vezes inuteis
                         //eliminar os requests
 
-                        if (other_TS[epoch] > _data.GetWriteTS(epoch)) _tmContact.BroadLease(Epoch, other_value[epoch]); //ver se correu bem, se não correu bem não aumenta a epoch?
+                        if (other_TS[epoch] > _data.GetWriteTS(epoch))
+                        {
+                            _tmContact.BroadLease(epoch, other_value[epoch]); //ver se correu bem, se não correu bem não aumenta a epoch?
+                        }
                         else _tmContact.BroadLease(epoch, my_value[epoch]);
                         _data.SetWriteTS(epoch, _data.RoundID);
 
                     }
-                    //x em x tempo faz
                 }
             }
         }
         public bool PrepareRequest(int epoch)
         {
-            PrepareRequest request = new PrepareRequest { RoundId = _data.RoundID++, Epoch = Epoch };
+            PrepareRequest request = new PrepareRequest { RoundId = _data.RoundID++, Epoch = epoch };
             return PrepareRequest(request, epoch);
         }
         public bool PrepareRequest(PrepareRequest request, int epoch)
@@ -158,7 +159,7 @@ namespace DADTKV_LM.Impls
 
         public bool AcceptRequest(int epoch)
         {
-            AcceptRequest request = new AcceptRequest { WriteTs = _data.RoundID };
+            AcceptRequest request = new AcceptRequest { WriteTs = _data.RoundID, Epoch = epoch };
             LeasePaxos lp;
             //comparar os TS e ver qual vamos aceitar
             if (GetOtherTS(epoch) > _data.GetWriteTS(epoch))
