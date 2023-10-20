@@ -61,14 +61,14 @@ namespace DADTKV_LM.Impls
         public int Id { get; set; }
         public int Epoch { get; set; }
 
-        public void cycle()
+        public void cycle(int timeSlotDuration, int numTimeSlots)
         {
             int epoch = 1;
             bool ack = true;
             int possible_leader = -1;
+
             while (true)
             {
-
                 while (Id != possible_leader + 1 && ack)
                 {
                     Thread.Sleep(5000); //dorme 5 sec e depois manda mensagem
@@ -81,12 +81,14 @@ namespace DADTKV_LM.Impls
                         }
                     }
                 }
-                //ver aqui a passagem do tempo
-                //criar Timer
-                //timeSlot = new System.Timers.Timer(_time_slot); tem que receber o timeslot do Parser
-                RunPaxosInstance(epoch++); //if we are the leader => run Paxos
 
-                possible_leader = Id;
+                for (int i = 0; i < numTimeSlots; i++)
+                {
+                    Thread t = new Thread(() => RunPaxosInstance(epoch));
+                    t.Start();
+                    Thread.Sleep(timeSlotDuration);
+                    epoch++;
+                }
             }
         }
         public void RunPaxosInstance(int epoch)
@@ -96,7 +98,7 @@ namespace DADTKV_LM.Impls
                 while (_data.IsLeader)
                 {
                     SetMyValue(epoch, _data.GetMyValue());
-                    
+
                     while (GetMyValue(epoch).Count == 0)
                     {
                         Thread.Sleep(1000);
@@ -111,7 +113,7 @@ namespace DADTKV_LM.Impls
                     {
                         _data.SetWriteTS(epoch, _data.RoundID);
                         //_data.Write_TS = _data.RoundID;//evitamos fazer muitas vezes inuteis
-                                                       //eliminar os requests
+                        //eliminar os requests
 
                         if (other_TS[epoch] > _data.GetWriteTS(epoch)) _tmContact.BroadLease(Epoch, other_value[epoch]); //ver se correu bem, se não correu bem não aumenta a epoch?
                         else _tmContact.BroadLease(epoch, my_value[epoch]);
@@ -127,7 +129,7 @@ namespace DADTKV_LM.Impls
             PrepareRequest request = new PrepareRequest { RoundId = _data.RoundID++, Epoch = Epoch };
             return PrepareRequest(request, epoch);
         }
-        public bool PrepareRequest(PrepareRequest request,int epoch)
+        public bool PrepareRequest(PrepareRequest request, int epoch)
         {
             bool res;
             lock (this)
@@ -179,7 +181,7 @@ namespace DADTKV_LM.Impls
             }
             request.LeaderId = Id;
             return _lmcontact.AcceptRequest(request);
-           
+
         }
     }
 }
