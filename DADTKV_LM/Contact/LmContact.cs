@@ -87,7 +87,17 @@ namespace DADTKV_LM.Contact
                     lm_stubs.Add(new PaxosService.PaxosServiceClient(channel));
                 }
             }
-            return lm_stubs[possible_leader].GetLeaderAckAsync(new AckRequest(), new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult().Ack;  //fazer isto num try
+            AcceptReply reply;
+            try 
+            {
+                reply = lm_stubs[possible_leader].GetLeaderAckAsync(new AckRequest(), new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();
+            }
+            catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded)
+            {
+                Console.WriteLine("Leader probably dead");
+                reply = new AcceptReply { Ack = false };
+            }
+            return reply.Ack;
         }
     }
 }
