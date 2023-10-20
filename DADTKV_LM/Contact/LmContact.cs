@@ -16,10 +16,8 @@ namespace DADTKV_LM.Contact
             foreach (string url in lm_urls) lm_channels.Add(GrpcChannel.ForAddress(url));
         }
 
-        public bool PrepareRequest(PrepareRequest request,int Write_TS, int Other_TS, List<Request> Others_value)
+        public Promise PrepareRequest(PrepareRequest request, int i)
         {
-            Promise reply;
-            int promises = 1;
             if (lm_stubs == null)
             {
                 lm_stubs = new List<PaxosService.PaxosServiceClient>();
@@ -28,22 +26,8 @@ namespace DADTKV_LM.Contact
                     lm_stubs.Add(new PaxosService.PaxosServiceClient(channel));
                 }
             }
-            foreach (PaxosService.PaxosServiceClient stub in lm_stubs)
-            {
-                reply = stub.PrepareAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
-                if (reply.Ack) promises++;
 
-                Other_TS = Write_TS;
-                if (reply.WriteTs > Other_TS)
-                {
-                    foreach (LeasePaxos l in reply.Leases)
-                    {
-                        Others_value.Add(new Request(l.Tm, l.Keys.ToList(), l.LeaseId));
-                    }
-                    Other_TS = reply.WriteTs;
-                }
-            }
-            return promises > (lm_stubs.Count + 1) / 2; //true se for maioria, removemos da lista se morrerem?
+            return lm_stubs[i].PrepareAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
         }
         public bool BroadAccepted(AcceptRequest request)
         {

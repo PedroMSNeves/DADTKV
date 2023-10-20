@@ -15,6 +15,7 @@ message Promise {
 	int32 write_ts = 1;
 	repeated LeasePaxos leases = 2;
 	bool ack = 3; //if its false its not a promise
+	int32 epoch = 4;
 }
 message AcceptRequest {
 	int32 write_ts = 1;
@@ -25,8 +26,10 @@ message AcceptRequest {
 
 message AcceptReply {
 	bool ack = 1;
+	int32 epoch = 2;
 }
 message AckRequest {
+	int32 epoch = 1;
 }
 
 service PaxosService {

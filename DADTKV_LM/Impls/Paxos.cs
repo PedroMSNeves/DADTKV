@@ -11,14 +11,14 @@ namespace DADTKV_LM.Impls
         private LeaseData _data;
         LmContact _lmcontact;
         TmContact _tmContact;
-        int epoch = -1;
+        //int epoch = -1;
 
         public Paxos(string name, LeaseData data, List<string> tm_urls, List<string> lm_urls)
         {
             Name = name;
             _data = data;
             //When paxos is called needs to select the requests that don´t conflict to define our value
-            My_value = _data.GetMyValue();
+            My_value = _data.GetMyValue(); //quando é que fazemos isto?
             _tmContact = new TmContact(tm_urls);
             _lmcontact = new LmContact(name, lm_urls);
         }
@@ -35,22 +35,25 @@ namespace DADTKV_LM.Impls
             Promise reply;
             Console.WriteLine(request.LeaderId);
 
-            epoch = request.Epoch;
-
             lock (_data)
             {
+                int epoch = request.Epoch;
+
                 if (_data.IsLeader && request.RoundId > _data.RoundID)
                 {
                     _data.IsLeader = false;
                 }
-                if (request.RoundId <= _data.Read_TS)
+                if (request.RoundId <= _data.GetReadTS(epoch))
                 {
                     reply = new Promise { Ack = false };
                     return reply;
                 }
-                _data.Read_TS = request.RoundId;
+
+                _data.SetReadTS(epoch, request.RoundId);
                 _data.Possible_Leader = request.LeaderId;
-                reply = new Promise { WriteTs = _data.Write_TS, Ack = true };
+
+                reply = new Promise { WriteTs = _data.GetWriteTS(epoch), Ack = true };
+
                 foreach (Request r in My_value)
                 {
                     LeasePaxos lp = new LeasePaxos { Tm = r.Tm_name, LeaseId = r.Lease_ID };
@@ -70,18 +73,19 @@ namespace DADTKV_LM.Impls
             AcceptReply reply = new AcceptReply();
             Console.WriteLine(request.LeaderId);
             foreach (LeasePaxos s in request.Leases)foreach(string key  in s.Keys) Console.WriteLine(key);
-            if (request.WriteTs < _data.Read_TS) // precisa de lock
+            if (request.WriteTs < _data.GetReadTS(request.Epoch)) // precisa de lock
             {
                 reply.Ack = false;
                 return reply;
             }
-            epoch = request.Epoch;
 
             //broadcast accept
             bool result = _lmcontact.BroadAccepted(request);
             //só aplica o valor recebido depois de receber uma maioria de accepted dos outros, falta essa msg no proto
             lock (this)
             {
+                int epoch = request.Epoch;
+
                 if (_data.IsLeader && request.WriteTs > _data.RoundID)
                 {
                     _data.IsLeader = false;
@@ -89,7 +93,7 @@ namespace DADTKV_LM.Impls
                 if (!result) reply.Ack = false;
                 else
                 {
-                    if (request.WriteTs == _data.Read_TS) // se isto nao acontecer e porque deu promise entretanto
+                    if (request.WriteTs == _data.GetReadTS(epoch)) // se isto nao acontecer e porque deu promise entretanto
                     {
                         reply.Ack = true;
                         foreach (LeasePaxos l in request.Leases)
@@ -113,7 +117,7 @@ namespace DADTKV_LM.Impls
         public AcceptReply Accpted(AcceptRequest request) //quandp recebe Accept e aceita, manda Accepted para todos os outros learners
         {
             AcceptReply reply = new AcceptReply();
-            if (request.WriteTs != _data.Read_TS)
+            if (request.WriteTs != _data.GetReadTS(request.Epoch))
             {
                 reply.Ack = false;
                 return reply;
@@ -123,11 +127,11 @@ namespace DADTKV_LM.Impls
         }
         public override Task<AcceptReply> GetLeaderAck(AckRequest request, ServerCallContext context)
         {
-            return Task.FromResult(LeaderAck());
+            return Task.FromResult(LeaderAck(request));
         }
-        public AcceptReply LeaderAck() //returns promise if roundId >  my readTS
+        public AcceptReply LeaderAck(AckRequest request) //returns promise if roundId >  my readTS
         {
-            AcceptReply reply = new AcceptReply();
+            AcceptReply reply = new AcceptReply { Epoch = request.Epoch };
 
             lock (_data)
             {

@@ -2,6 +2,7 @@
 using Grpc.Core;
 using DADTKV_LM.Structs;
 using DADTKV_LM.Contact;
+using Grpc.Net.Client;
 
 namespace DADTKV_LM.Impls
 {
@@ -10,29 +11,59 @@ namespace DADTKV_LM.Impls
         private LeaseData _data;
         LmContact _lmcontact;
         TmContact _tmContact;
+        Dictionary<int, List<Request>> my_value;
+        Dictionary<int, List<Request>> other_value;
+        Dictionary<int, int> other_TS;
+
 
         public PaxosLeader(string name, LeaseData data, int id, List<string> tm_urls, List<string> lm_urls)
         {
             Name = name;
-            Others_value = new List<Request>();
-            Other_TS = 0;
             _data = data;
             Id = id;
-            Epoch = 0;
-            My_value = _data.GetMyValue();
+
+            Epoch = 0; //mudar este, provavelmente vai sair daqui
             _tmContact = new TmContact(tm_urls);
             _lmcontact = new LmContact(name, lm_urls);
 
+            my_value = new Dictionary<int, List<Request>>();
+            other_value = new Dictionary<int, List<Request>>();
+            other_TS = new Dictionary<int, int>();
+
         }
         public string Name { get; }
-        public List<Request> My_value { set; get; }
-        public List<Request> Others_value { set; get; }
-        public int Other_TS { get; set; }
+        public List<Request> GetMyValue(int epoch)
+        {
+            return my_value[epoch];
+        }
+        public void SetMyValue(int epoch, List<Request> req)
+        {
+            my_value[epoch].Clear();
+            my_value[epoch].AddRange(req);
+        }
+        public List<Request> GetOtherValue(int epoch)
+        {
+            return other_value[epoch];
+        }
+        public void SetOtherValue(int epoch, List<Request> req)
+        {
+            other_value[epoch].Clear();
+            other_value[epoch].AddRange(req);
+        }
+        public int GetOtherTS(int epoch)
+        {
+            return other_TS[epoch];
+        }
+        public void SetOtherTS(int epoch, int val)
+        {
+            other_TS[epoch] = val;
+        }
         public int Id { get; set; }
         public int Epoch { get; set; }
 
         public void cycle()
         {
+            int epoch = 1;
             bool ack = true;
             int possible_leader = -1;
             while (true)
@@ -53,56 +84,84 @@ namespace DADTKV_LM.Impls
                 //ver aqui a passagem do tempo
                 //criar Timer
                 //timeSlot = new System.Timers.Timer(_time_slot); tem que receber o timeslot do Parser
-                RunPaxosInstance(); //if we are the leader => run Paxos
+                RunPaxosInstance(epoch++); //if we are the leader => run Paxos
 
                 possible_leader = Id;
             }
         }
-        public void RunPaxosInstance()
+        public void RunPaxosInstance(int epoch)
         {
             lock (this)
             {
                 while (_data.IsLeader)
                 {
-                    My_value = _data.GetMyValue();
-                    while (My_value.Count == 0)
+                    SetMyValue(epoch, _data.GetMyValue());
+                    
+                    while (GetMyValue(epoch).Count == 0)
                     {
                         Thread.Sleep(1000);
-                        My_value = _data.GetMyValue();
+                        SetMyValue(epoch, _data.GetMyValue());
                     }
-                    Epoch++;//implementar tempo
-                    while (!PrepareRequest())
+                    Epoch++;//implementar tempo, isto vai sair daqui
+                    while (!PrepareRequest(epoch))
                     {
-                        _data.RoundID = Other_TS + 1;//evitamos fazer muitas vezes inuteis
+                        _data.RoundID = GetOtherTS(epoch) + 1;//evitamos fazer muitas vezes inuteis
                     }
-                    if (AcceptRequest())
+                    if (AcceptRequest(epoch))
                     {
-                        _data.Write_TS = _data.RoundID;//evitamos fazer muitas vezes inuteis
+                        _data.SetWriteTS(epoch, _data.RoundID);
+                        //_data.Write_TS = _data.RoundID;//evitamos fazer muitas vezes inuteis
                                                        //eliminar os requests
 
-                        if (Other_TS > _data.Write_TS) _tmContact.BroadLease(Epoch, Others_value); //ver se correu bem, se não correu bem não aumenta a epoch?
-                        else _tmContact.BroadLease(Epoch, My_value);
-                        _data.Write_TS = _data.RoundID;
+                        if (other_TS[epoch] > _data.GetWriteTS(epoch)) _tmContact.BroadLease(Epoch, other_value[epoch]); //ver se correu bem, se não correu bem não aumenta a epoch?
+                        else _tmContact.BroadLease(epoch, my_value[epoch]);
+                        _data.SetWriteTS(epoch, _data.RoundID);
 
                     }
                     //x em x tempo faz
                 }
             }
         }
-        public bool PrepareRequest()
+        public bool PrepareRequest(int epoch)
         {
-            PrepareRequest request = new PrepareRequest { RoundId = _data.IncrementRoundID(), Epoch = Epoch };
-            return _lmcontact.PrepareRequest(request, _data.Write_TS, Other_TS, Others_value);
+            PrepareRequest request = new PrepareRequest { RoundId = _data.RoundID++, Epoch = Epoch };
+            return PrepareRequest(request, epoch);
+        }
+        public bool PrepareRequest(PrepareRequest request,int epoch)
+        {
+            bool res;
+            lock (this)
+            {
+                Promise reply;
+                int promises = 1;
+                for (int i = 0; i < _lmcontact.lm_stubs.Count; i++)
+                {
+                    reply = _lmcontact.PrepareRequest(request, i);
+                    if (reply.Ack) promises++;
+
+                    SetOtherTS(epoch, _data.GetWriteTS(epoch));
+                    if (reply.WriteTs > GetOtherTS(epoch))
+                    {
+                        foreach (LeasePaxos l in reply.Leases)
+                        {
+                            other_value[epoch].Add(new Request(l.Tm, l.Keys.ToList(), l.LeaseId));
+                        }
+                        SetOtherTS(epoch, reply.WriteTs);
+                    }
+                }
+                res = promises > (_lmcontact.lm_stubs.Count + 1) / 2;
+            }
+            return res;
         }
 
-        public bool AcceptRequest()
+        public bool AcceptRequest(int epoch)
         {
             AcceptRequest request = new AcceptRequest { WriteTs = _data.RoundID };
             LeasePaxos lp;
             //comparar os TS e ver qual vamos aceitar
-            if (Other_TS > _data.Write_TS)
+            if (GetOtherTS(epoch) > _data.GetWriteTS(epoch))
             {
-                foreach (Request r in Others_value)
+                foreach (Request r in GetOtherValue(epoch))
                 {
                     lp = new LeasePaxos { Tm = r.Tm_name, LeaseId = r.Lease_ID };
                     foreach (string k in r.Keys) { lp.Keys.Add(k); }
@@ -111,7 +170,7 @@ namespace DADTKV_LM.Impls
             }
             else
             {
-                foreach (Request r in My_value)
+                foreach (Request r in GetMyValue(epoch))
                 {
                     lp = new LeasePaxos { Tm = r.Tm_name, LeaseId = r.Lease_ID };
                     foreach (string k in r.Keys) { lp.Keys.Add(k); }
