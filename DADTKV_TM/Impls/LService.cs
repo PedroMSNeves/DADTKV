@@ -25,6 +25,7 @@ namespace DADTKV_TM.Impls
         {
             List<FullLease> leases = new List<FullLease>();
             bool ready = false;
+            bool exists = false;
             lock (waitLeases)
             {
                 foreach (LeaseProto lp in request.Leases)
@@ -39,18 +40,22 @@ namespace DADTKV_TM.Impls
                     {
                         if (wl.Leases.Equals(leases))
                         {
+                            exists = true;
                             wl.increaseAcks();
                             if (wl.Acks == _lm_count) ready = true;
                         }
                         remove.Add(wl);
                     }
                 }
+                //adicionar se nao existir
+                if (!exists)
+                {
+                    if (_lm_count == 1) store.WaitLeases(leases, request.Epoch);
+                    else waitLeases.Add(new WaitLeases(request.Epoch, leases));
+                }
                 if (ready)
                 {
-                    foreach (WaitLeases wl in remove)
-                    {
-                        waitLeases.Remove(wl);
-                    }
+                    foreach (WaitLeases wl in remove) waitLeases.Remove(wl);
                     store.WaitLeases(leases, request.Epoch);
                 }
 

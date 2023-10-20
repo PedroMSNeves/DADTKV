@@ -12,7 +12,7 @@ namespace DADTKV_TM.Structs
         public WaitLeases(int epoch, List<FullLease> leases) 
         {
             Epoch = epoch;
-            Acks = 0;
+            Acks = 1; // 1 ack always
             Leases = leases;
         }
         public int Epoch { get; }
