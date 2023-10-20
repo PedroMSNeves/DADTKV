@@ -19,11 +19,19 @@ namespace DADTKV_LM
             IsLeader = leader;
             read_ts = new Dictionary<int, int>();
             write_ts = new Dictionary<int, int>();
-            RoundID = 1;
+            RoundID = 0;
         }
-        public int GetReadTS(int epoch) {  return read_ts[epoch]; }
+        public int GetReadTS(int epoch) 
+        {
+            if (read_ts.ContainsKey(epoch)) return read_ts[epoch];
+            else return 0;
+        }
         public void SetReadTS(int epoch, int val) { read_ts[epoch] = val; }
-        public int GetWriteTS(int epoch) { return write_ts[epoch]; }
+        public int GetWriteTS(int epoch) 
+        { 
+            if (write_ts.ContainsKey(epoch)) return write_ts[epoch];
+            else return 0; 
+        }
         public void SetWriteTS(int epoch, int val) { write_ts[epoch] = val; }
         public int RoundID { get; set; }
         public int IncrementRoundID(int epoch)

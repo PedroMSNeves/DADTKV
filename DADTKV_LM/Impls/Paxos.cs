@@ -33,8 +33,8 @@ namespace DADTKV_LM.Impls
         public Promise Prep(PrepareRequest request) //returns promise if roundId >  my readTS
         {
             Promise reply;
-            Console.WriteLine(request.LeaderId);
-            Console.WriteLine(request.Epoch);
+            Console.WriteLine("leader_id: "+request.LeaderId);
+            Console.WriteLine("epoch: "+request.Epoch);
 
             lock (_data)
             {
@@ -51,6 +51,8 @@ namespace DADTKV_LM.Impls
                 }
 
                 _data.SetReadTS(epoch, request.RoundId);
+                Console.WriteLine("Round Id recebido: "+ request.RoundId);
+                Console.WriteLine("Meu novo read ts: " + _data.GetReadTS(epoch));
                 _data.Possible_Leader = request.LeaderId;
 
                 reply = new Promise { WriteTs = _data.GetWriteTS(epoch), Ack = true, Epoch = epoch };
@@ -117,14 +119,20 @@ namespace DADTKV_LM.Impls
         }
         public AcceptReply Accpted(AcceptRequest request) //quandp recebe Accept e aceita, manda Accepted para todos os outros learners
         {
-            AcceptReply reply = new AcceptReply { Epoch = request.Epoch };
-            if (request.WriteTs != _data.GetReadTS(request.Epoch))
+            lock (this)
             {
-                reply.Ack = false;
+                Console.WriteLine("RECEBI ACCEPTED");
+                AcceptReply reply = new AcceptReply { Epoch = request.Epoch };
+                Console.WriteLine("request writets: " + request.WriteTs);
+                Console.WriteLine("ReadTs: " + _data.GetReadTS(request.Epoch));
+                if (request.WriteTs != _data.GetReadTS(request.Epoch) && !_data.IsLeader)
+                {
+                    reply.Ack = false;
+                    return reply;
+                }
+                reply.Ack = true;
                 return reply;
             }
-            reply.Ack = true;
-            return reply;
         }
         public override Task<AcceptReply> GetLeaderAck(AckRequest request, ServerCallContext context)
         {

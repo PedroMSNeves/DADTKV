@@ -15,9 +15,11 @@ namespace DADTKV_LM.Contact
             _name = name;
             foreach (string url in lm_urls) lm_channels.Add(GrpcChannel.ForAddress(url));
         }
+        public int NumOfStubs() { return lm_channels.Count; }
 
         public Promise PrepareRequest(PrepareRequest request, int i)
         {
+            Promise reply;
             if (lm_stubs == null)
             {
                 lm_stubs = new List<PaxosService.PaxosServiceClient>();
@@ -26,10 +28,21 @@ namespace DADTKV_LM.Contact
                     lm_stubs.Add(new PaxosService.PaxosServiceClient(channel));
                 }
             }
+            try
+            {
+                Console.WriteLine("i: "+i);
+                Console.WriteLine(lm_stubs[i].ToString());
+                reply = lm_stubs[i].PrepareAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();
+            }
+            catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded || ex.StatusCode == StatusCode.Unavailable)// || ex.StatusCode == StatusCode.Unknown)
+            {
+                reply = new Promise { Ack = false };
+                Console.WriteLine("Erro ao contactar os outros LMs");
+            }
 
-            return lm_stubs[i].PrepareAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
+            return reply;
         }
-        public bool BroadAccepted(AcceptRequest request)
+        public bool BroadAccepted(AcceptRequest request) //Used by the others to propagate accepted
         {
             List<int> values = new List<int>();
             values.Add(0);//ack counter
@@ -49,6 +62,7 @@ namespace DADTKV_LM.Contact
                 Thread t = new Thread(() => { sendAccepted(ref values, stub, request); });
                 t.Start();
             }
+            Console.WriteLine("BROADCAST ACCEPTED");
             lock (this)
             {
                 while (!(values[0] + 1 >= (lm_stubs.Count + 1) / 2 || values[1] >= (lm_stubs.Count + 1) / 2)) Monitor.Wait(this);
@@ -56,27 +70,44 @@ namespace DADTKV_LM.Contact
                 else return false;
             }
         }
-        public bool AcceptRequest(AcceptRequest request)
-        {
-            AcceptReply reply;
-            int acks = 1;
-            foreach (PaxosService.PaxosServiceClient stub in lm_stubs)
-            {
-                reply = stub.AcceptAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
-                if (reply.Ack) acks++;
-            }
-            return acks > (lm_stubs.Count + 1) / 2; //em vez do count vai ser com o bitmap dos lms que estao vivos
-        }
         private void sendAccepted(ref List<int> values, PaxosService.PaxosServiceClient stub, AcceptRequest request)
         {
-            AcceptReply reply = stub.AcceptedAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();
+            Console.WriteLine("NEW THREAD TO SEND ACCEPTED TO OTHERS");
+            AcceptReply reply = stub.AcceptedAsync(request).GetAwaiter().GetResult();
             lock (this)
             {
                 if (reply.Ack) values[0]++;
                 else values[1]++;
                 Monitor.Pulse(this);
             }
+            Console.WriteLine("ACCEPTED SENDED YES: " + values[0]);
+            Console.WriteLine("ACCEPTED SENDED NO: " + values[1]);
         }
+        public bool AcceptRequest(AcceptRequest request) //Used by the leaders to propagate accept 
+        {
+            Console.WriteLine("IN");
+            List<Grpc.Core.AsyncUnaryCall<AcceptReply>> replies = new List<Grpc.Core.AsyncUnaryCall<AcceptReply>>();
+            int acks = 1;
+            foreach (PaxosService.PaxosServiceClient stub in lm_stubs)
+            {
+                replies.Add(stub.AcceptAsync(request)); // tirar isto de syncrono
+            }
+            foreach (Grpc.Core.AsyncUnaryCall<AcceptReply> reply in replies)
+            {
+                try
+                {
+                    if (reply.ResponseAsync.Result.Ack) acks++;
+                }
+                catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded)
+                {
+                    Console.WriteLine("Greeting timeout.");
+                }
+            }
+            Console.WriteLine("ACKS :" + acks);
+            Console.WriteLine("OUT");
+            return acks > (lm_stubs.Count + 1) / 2; //em vez do count vai ser com o bitmap dos lms que estao vivos
+        }
+       
         public bool getLeaderAck(int possible_leader)
         {
             if (lm_stubs == null) //É preciso?

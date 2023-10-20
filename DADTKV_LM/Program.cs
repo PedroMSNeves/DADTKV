@@ -81,7 +81,6 @@ namespace DADTKV_LM
                 Console.WriteLine("Waiting " + timeToWait.TotalMilliseconds + "ms to start");
                 Thread.Sleep(timeToWait);
             }
-            
             pl.cycle(timeSlotDuration, numTimeSlots);
         }
     }
