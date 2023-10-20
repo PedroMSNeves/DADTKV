@@ -70,7 +70,7 @@ namespace DADTKV_TM
             {
                 Services = { TmService.BindService(new ServerService(st, args[0])),
                             BroadCastService.BindService(new BroadService(st)),
-                            LeaseService.BindService(new LService(st)) },
+                            LeaseService.BindService(new LService(st, lm_urls.Count)) },
                 Ports = { serverPort }
             };
 
