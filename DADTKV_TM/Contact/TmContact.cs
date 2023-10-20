@@ -48,7 +48,7 @@ namespace DADTKV_TM.Contact
                 replies.Add(stub.BroadCastAsync(request)); // tirar isto de syncrono
             }
             Random rd = new Random();
-            while (acks < 2)
+            while (acks < tm_stubs.Count)
             {
                 Monitor.Wait(st, rd.Next(100, 150));
                 for (int i = 0; i < replies.Count; i++)
@@ -86,7 +86,7 @@ namespace DADTKV_TM.Contact
                 replies.Add(stub.ResidualDeletionAsync(residualDeletionRequest)); // tirar isto de syncrono
             }
             Random rd = new Random();
-            while (acks < 2)
+            while (acks < tm_stubs.Count)
             {
                 Monitor.Wait(st, rd.Next(100, 150));
                 for (int i = 0; i < replies.Count; i++)
