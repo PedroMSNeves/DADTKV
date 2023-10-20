@@ -1,35 +1,28 @@
 ﻿namespace DADTKV_TM.Structs
 {
     /// <summary>
-    /// Enum to retain the information about the lease request
-    /// </summary>
-    public enum leaseRequested
-    {
-        No,
-        Maybe,
-        Yes
-    }
-    /// <summary>
     /// Class for storing the information of a transaction request
     /// </summary>
     public class Request
     {
-        public Request(List<string> reads, List<DadIntProto> writes, int transaction_number, int epoch)
+        public Request(List<string> reads, List<DadIntProto> writes)
         {
             Reads = reads;
             Writes = writes;
-            Transaction_number = transaction_number;
-            Situation = leaseRequested.No;
             Keys = GetKeys();
-            Epoch = epoch;
         }
-        public leaseRequested Situation { set; get; }
         public List<string> Reads { get; }
         public List<DadIntProto> Writes { get; }
         public int Transaction_number { set; get; }
-
+        public int Lease_number { set;  get; }
         public List<string> Keys { get; }
         public int Epoch { set; get; }
+
+        public void initialize (int transaction_number, int epoch)
+        {
+            Epoch = epoch;
+            Transaction_number = transaction_number;
+        }
 
         private List<string> GetKeys()
         {
@@ -59,6 +52,14 @@
                 if (!other.Keys.Contains(key)) return false;
             }
             return true;
+        }
+        public bool Intersection(Request other)
+        {
+            foreach (string key in Keys)
+            {
+                if (other.Keys.Contains(key)) return true;
+            }
+            return false;
         }
     }
 }

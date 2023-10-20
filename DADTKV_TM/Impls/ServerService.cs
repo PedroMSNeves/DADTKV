@@ -34,15 +34,5 @@ namespace DADTKV_TM.Impls
 
             return tx;
         }
-        /*public bool LeaseRequest(ref List<string> reads,ref List<DadIntProto> writes)
-        {
-            List<string> keys = new List<string>();
-            foreach (string key in reads) { keys.Add(key); }
-            foreach (DadIntProto write in writes) { keys.Add(write.Key); }
-            keys = keys.Distinct().ToList(); // retira duplicados
-            _lmcontact.RequestLease(keys); //try catch
-
-            return true;
-        }*/
     }
 }

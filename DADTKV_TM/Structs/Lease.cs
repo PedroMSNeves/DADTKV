@@ -5,7 +5,7 @@
     /// </summary>
     public class FullLease : Lease
     {
-        public FullLease(string tm_name, int epoch,List<string> keys) : base (tm_name, epoch)
+        public FullLease(string tm_name, int epoch,List<string> keys, int lease_number) : base (tm_name, epoch, lease_number)
         {
             Keys = keys;
         }
@@ -48,15 +48,17 @@
 
     public class Lease
     {
-        public Lease(string tm_name, int epoch)
+        public Lease(string tm_name, int epoch, int lease_number)
         {
             Tm_name = tm_name;
             Epoch = epoch;
             End = false;
+            Lease_number = lease_number;
         }
         public string Tm_name { get; }
         public int Epoch { get; }
         public bool End { set; get; }
+        public int Lease_number { get; }
 
         public override string ToString() => $"({Tm_name}, {Epoch}, {End})";
     }

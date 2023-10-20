@@ -26,7 +26,8 @@ namespace DADTKV_LM.Impls
         }
         public LeaseReply Ls(LeaseRequest request)
         {
-            _data.AddRequest(new Request(request.Id, request.Keys.ToList()));
+            Console.WriteLine("NEW REQUEST: " + request.ToString());
+            _data.AddRequest(new Request(request.Id, request.Keys.ToList(), request.LeaseId));
             return new LeaseReply { Ack = true };
         }
 

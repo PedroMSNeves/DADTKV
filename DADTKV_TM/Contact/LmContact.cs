@@ -9,14 +9,12 @@ namespace DADTKV_TM.Contact
     /// </summary>
     public class LmContact
     {
-        private int _lease_id;
         private string _name;
         List<LeaseService.LeaseServiceClient> lm_stubs = null;
         List<GrpcChannel> lm_channels = new List<GrpcChannel>();
 
         public LmContact(string name, List<string> lm_urls)
         {
-            _lease_id = 0;
             _name = name;
             foreach (string url in lm_urls)
             {
@@ -31,10 +29,11 @@ namespace DADTKV_TM.Contact
             }
 
         }
-        public bool RequestLease(List<string> keys)
+        public bool RequestLease(List<string> keys, int leaseId)
         {
             LeaseReply reply;
-            LeaseRequest request = new LeaseRequest { Id = _name }; //cria request
+            LeaseRequest request = new LeaseRequest { Id = _name, LeaseId = leaseId }; //cria request
+            Console.WriteLine("REQUEST LEASE: " + request.ToString());  
             request.Keys.AddRange(keys);
             if(lm_stubs == null)
             {
@@ -49,9 +48,7 @@ namespace DADTKV_TM.Contact
                 // Perguntar se basta receber ack de apenas 1 Lm, se precisamos de todos os ack ou uma maioria
                 reply = stub.LeaseAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();
             }
-            incrementLeaseId();
             return true;
         }
-        public void incrementLeaseId() { _lease_id++; }
     }
 }

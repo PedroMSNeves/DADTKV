@@ -21,14 +21,12 @@ namespace DADTKV_TM.Impls
         public LeaseReply LBCast(LeaseBroadCastRequest request)
         {
             List<FullLease> leases = new List<FullLease>();
-            Console.WriteLine("newleases");
             foreach (LeaseProto lp in request.Leases)
             {
                 Console.WriteLine(lp.ToString());
-                leases.Add(new FullLease(lp.Tm,request.Epoch,lp.Keys.ToList()));
+                leases.Add(new FullLease(lp.Tm,request.Epoch,lp.Keys.ToList(), lp.LeaseId));
             }
             store.NewLeases(leases, request.Epoch);
-            //if(store.getName() == "tm2") Thread.Sleep(10000);
             return new LeaseReply { Ack = true };
         }
     }

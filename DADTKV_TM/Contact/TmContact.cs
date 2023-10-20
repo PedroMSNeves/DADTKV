@@ -25,11 +25,12 @@ namespace DADTKV_TM.Contact
                 }
             }
         }
-        public bool BroadCastChanges(List<DadIntProto> writes, string name, int epoch)
+        public bool BroadCastChanges(List<DadIntProto> writes, string name, int epoch, Store st)
         {
-            BroadReply reply;
-            BroadRequest request = new BroadRequest { TmName = name , Epoch = epoch };
+            List<Grpc.Core.AsyncUnaryCall<BroadReply>> replies = new List<Grpc.Core.AsyncUnaryCall<BroadReply>>();
+            BroadRequest request = new BroadRequest { TmName = name, Epoch = epoch };
             List<DadIntTmProto> writesTm = new List<DadIntTmProto>();
+            int acks = 0;
             foreach (DadIntProto tm in writes) writesTm.Add(new DadIntTmProto { Key = tm.Key, Value = tm.Value });
             request.Writes.AddRange(writesTm);
 
@@ -44,17 +45,29 @@ namespace DADTKV_TM.Contact
 
             foreach (BroadCastService.BroadCastServiceClient stub in tm_stubs)
             {
-                // perguntar se temos sempre de receber todos os ack de todos os Tm senão dá revert
-                // propagar para todos os servers corretos
-                // provavelmente meter quando se recebe a dar broadcast again
-                // para isso possivelmente temos uma lista em cada Tm com nºtransacao, nome Tm
-                //Console.WriteLine("In stubs");
-                //Console.ReadKey();
-                reply = stub.BroadCastAsync(request).GetAwaiter().GetResult(); // tirar isto de syncrono
+                replies.Add(stub.BroadCastAsync(request)); // tirar isto de syncrono
             }
+            Random rd = new Random();
+            while (acks < tm_stubs.Count)
+            {
+                Monitor.Wait(st, rd.Next(100, 150));
+                for (int i = 0; i < replies.Count; i++)
+                {
+                    if (replies[i].ResponseAsync.IsCompleted)
+                    {
+                        if (replies[i].ResponseAsync.Result.Ack == true) acks++;
+                        replies.Remove(replies[i]);
+                        i--;
+                        if (acks == 2) break;
+                    }
+                }
+                if (replies.Count == 0) break; //error
+            }
+            Console.Write("RESULTADO PROPAGATE CHEGOU AOS TMs? ");
+            Console.WriteLine(acks);
             return true;
         }
-        public bool DeleteResidualKeys(List<string> residualKeys , string name, int epoch) 
+        public bool DeleteResidualKeys(List<string> residualKeys , string name, int epoch, Store st) 
         {
             List<Grpc.Core.AsyncUnaryCall<BroadReply>> replies = new List<Grpc.Core.AsyncUnaryCall<BroadReply>>();
             ResidualDeletionRequest residualDeletionRequest = new ResidualDeletionRequest { TmName = name, Epoch = epoch };
@@ -72,11 +85,23 @@ namespace DADTKV_TM.Contact
             {
                 replies.Add(stub.ResidualDeletionAsync(residualDeletionRequest)); // tirar isto de syncrono
             }
-            foreach (Grpc.Core.AsyncUnaryCall<BroadReply> reply in replies)
+            Random rd = new Random();
+            while (acks < tm_stubs.Count)
             {
-                if (reply.ResponseAsync.Result.Ack) acks++;
+                Monitor.Wait(st, rd.Next(100, 150));
+                for (int i = 0; i < replies.Count; i++)
+                {
+                    if (replies[i].ResponseAsync.IsCompleted)
+                    {
+                        if (replies[i].ResponseAsync.Result.Ack == true) acks++;
+                        replies.Remove(replies[i]);
+                        i--;
+                        if (acks == 2) break;
+                    }
+                }
+                if (replies.Count == 0) break; //error
             }
-            Console.Write("RESULTADO PROPAGATE CHEGOU AOS TMs? ");
+            Console.Write("RESULTADO Residual Lease CHEGOU AOS TMs? ");
             Console.WriteLine(acks);
 
             // for now returns always true

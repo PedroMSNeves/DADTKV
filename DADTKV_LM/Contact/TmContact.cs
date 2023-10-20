@@ -36,7 +36,7 @@ namespace DADTKV_LM.Contact
             //Thread.Sleep(50000);
             foreach (Request r in leases) //as leases vem vazias
             {
-                LeaseProto lp = new LeaseProto { Tm = r.Tm_name };
+                LeaseProto lp = new LeaseProto { Tm = r.Tm_name, LeaseId = r.Lease_ID };
                 foreach (string k in r.Keys) { lp.Keys.Add(k); }
                 request.Leases.Add(lp);
             }
@@ -56,7 +56,7 @@ namespace DADTKV_LM.Contact
             foreach (LeaseService.LeaseServiceClient stub in tm_stubs)
             {
                 Console.WriteLine(request.Leases.Count);
-                replies.Add(stub.LeaseBroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10)))); //fazer isto num try
+                replies.Add(stub.LeaseBroadCastAsync(request)); //fazer isto num try
                 Console.WriteLine("DONE");
             }
             foreach (Grpc.Core.AsyncUnaryCall<LeaseReply> reply in replies)

@@ -96,7 +96,7 @@ namespace DADTKV_LM.Impls
             {
                 foreach (Request r in Others_value)
                 {
-                    lp = new LeasePaxos { Tm = r.Tm_name };
+                    lp = new LeasePaxos { Tm = r.Tm_name, LeaseId = r.Lease_ID };
                     foreach (string k in r.Keys) { lp.Keys.Add(k); }
                     request.Leases.Add(lp);
                 }
@@ -105,7 +105,7 @@ namespace DADTKV_LM.Impls
             {
                 foreach (Request r in My_value)
                 {
-                    lp = new LeasePaxos { Tm = r.Tm_name };
+                    lp = new LeasePaxos { Tm = r.Tm_name, LeaseId = r.Lease_ID };
                     foreach (string k in r.Keys) { lp.Keys.Add(k); }
                     request.Leases.Add(lp);
                 }
