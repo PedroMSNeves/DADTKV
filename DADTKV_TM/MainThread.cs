@@ -9,11 +9,12 @@
         }
         public void cycle()
         {
+            Random rd = new Random();
             while (true)
             {
                 _store.Execute();
                 _store.removeResidual();
-                Thread.Sleep(1000);
+                Thread.Sleep(rd.Next(100,500));
             }
         }
     }

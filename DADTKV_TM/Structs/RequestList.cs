@@ -23,31 +23,27 @@ namespace DADTKV_TM.Structs
             _lmContact = new LmContact(name, lm_urls);
         }
         public int get_epoch() { return _epoch; }
-        public List<Request> GetRequests() 
+        public List<Request> GetRequests(Store st) 
         {
             List<Request> buff;
-            lock (this)
-            {
-                while (buzy == 0) Monitor.Wait(this);
-                buff = buffer;
-            }
+
+            while (buzy == 0) Monitor.Wait(st);
+            buff = buffer;
+
             return buff; 
         }
         public List<Request> GetRequestsNow()
         {
             List<Request> buff;
-            lock (this)
-            {
-                buff = buffer;
-            }
+            buff = buffer;
+
             return buff;
         }
-        public int insert(Request req, bool lease)
+        public int insert(Request req, bool lease, Store st)
         {
             int tnumber;
-            lock (this)
-            {
-                while (buzy == MAX) Monitor.Wait(this);
+
+                while (buzy == MAX) Monitor.Wait(st);
                 tnumber = transaction_number++;
                 req.initialize(tnumber, _epoch);
                 if (!lease)
@@ -57,19 +53,18 @@ namespace DADTKV_TM.Structs
                 }
                 buffer.Add(req);
                 buzy++;
-                Monitor.PulseAll(this);
-            }
+                Monitor.PulseAll(st);
+         
             return tnumber;
         }
-        public void remove(int i)
+        public void remove(int i, Store st)
         {
-            lock (this)
-            {
+
                 buffer.RemoveAt(i);
                 buzy--;
 
-                Monitor.PulseAll(this);
-            }
+                Monitor.PulseAll(st);
+            
         }
         public void move(int transaction_number, List<DadIntProto> resultT, int err)
         {

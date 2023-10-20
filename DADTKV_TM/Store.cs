@@ -66,7 +66,7 @@ namespace DADTKV_TM
 
                 // Inserts the request into the queue, if no lease could be used, asks for a new one
                 Console.WriteLine("Insert");
-                tnum = _reqList.insert(req,lease);
+                tnum = _reqList.insert(req,lease,this);
                 Console.WriteLine("Insert END");
 
             }
@@ -243,15 +243,16 @@ namespace DADTKV_TM
         public void Execute()
         {
             int i = 0;
-            // Gets requests (waits until there is at least one)
             //Console.WriteLine("Execute");
             //Console.WriteLine("GetRequests");
-            List<Request> reqs = _reqList.GetRequestsNow();
-            //Console.WriteLine("GetRequests END");
-            if (reqs.Count == 0) return;
+            
 
             lock (this)
             {
+                // Gets requests (waits until there is at least one)
+                List<Request> reqs = _reqList.GetRequestsNow(); 
+
+                if (reqs.Count == 0) return;
                 while (true)
                 {
                     FullLease fl;
@@ -261,9 +262,9 @@ namespace DADTKV_TM
                     {
                         // Sequencial requests
                         Console.WriteLine("NO LEASE: WE need " + _name + " "+reqs[i].Lease_number);
-                        foreach (FullLease ff in _fullLeases)
+                        foreach (FullLease ff in _fullLeases.ToList())
                         {
-                            Console.Write("FL: " + ff.Tm_name + " " + ff.Lease_number+ " " + ff.End +  " KEYS: ");
+                            Console.Write("FL: " + ff.Tm_name + " " + ff.Lease_number + " " + ff.End + " KEYS: ");
                             foreach (string s in ff.Keys) Console.Write(s + " ");
                             Console.WriteLine();
                         }
@@ -285,7 +286,7 @@ namespace DADTKV_TM
                     // Remove from the request list
                     Console.WriteLine("Remove");
 
-                    _reqList.remove(i);
+                    _reqList.remove(i,this);
                     Console.WriteLine("Remove END");
 
                     if (i >= reqs.Count) break;
@@ -394,7 +395,6 @@ namespace DADTKV_TM
                 Console.WriteLine("LeaseRemove");
                 LeaseRemove(key, name, epoch);
                 Console.WriteLine("LeaseRemove END");
-
             }
             return true;
         }
@@ -523,11 +523,11 @@ namespace DADTKV_TM
         {
             lock (this)
             {
-                if (!possibleResiduals) return;
+                //if (!possibleResiduals) return;
                 bool used = false;
                 int maxEpoch = 0;
                 List<string> firstKeys = new List<string>();
-                foreach (FullLease fullLease in _fullLeases)
+                foreach (FullLease fullLease in _fullLeases.ToList())
                 {
                     if(fullLease.Tm_name == _name && fullLease.End)
                     {
@@ -535,16 +535,24 @@ namespace DADTKV_TM
                         {
                             if (fullLease.Lease_number == rq.Lease_number )
                             {
-                                if (fullLease.Epoch > maxEpoch) maxEpoch = fullLease.Epoch;
+                                //if (fullLease.Epoch > maxEpoch) maxEpoch = fullLease.Epoch;
                                 used = true;
                                 break;
                             }
                         }
-                        if (!used) firstKeys.Add(fullLease.Keys[0]);
+                        if (!used)
+                        {
+                            if (fullLease.Epoch > maxEpoch) maxEpoch = fullLease.Epoch;
+                            firstKeys.Add(fullLease.Keys[0]);
+                        }
                     }
                     used = false;
                 }
                 if (firstKeys.Count == 0) return;
+                Console.WriteLine("APAGAR LEASES RESIDUAIS: ");
+                foreach (string key in firstKeys) Console.WriteLine(key + " ");
+                Console.WriteLine();
+                //Console.ReadKey();
                 if (_tmContact.DeleteResidualKeys(firstKeys, _name, maxEpoch, this))
                 {
                     foreach(string key in firstKeys)
