@@ -55,7 +55,7 @@ namespace DADTKV_TM
                 {
                     if (!_store.ContainsKey(write.Key)) 
                     { 
-                        _store[write.Key] = -1; //default value (will never be read) (maybe nao ness)
+                        //_store[write.Key] = -1; //default value (will never be read) (maybe nao ness)
                         _leases[write.Key] = new Queue<Lease>();  
                     } 
                 }
