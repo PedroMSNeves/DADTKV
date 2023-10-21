@@ -58,7 +58,7 @@ namespace DADTKV_TM.Contact
                         if (replies[i].ResponseAsync.Result.Ack == true) acks++;
                         replies.Remove(replies[i]);
                         i--;
-                        if (acks == 2) break;
+                        if (acks == tm_stubs.Count) break;
                     }
                 }
                 if (replies.Count == 0) break; //error
@@ -96,7 +96,7 @@ namespace DADTKV_TM.Contact
                         if (replies[i].ResponseAsync.Result.Ack == true) acks++;
                         replies.Remove(replies[i]);
                         i--;
-                        if (acks == 2) break;
+                        if (acks == tm_stubs.Count) break;
                     }
                 }
                 if (replies.Count == 0) break; //error
@@ -109,3 +109,5 @@ namespace DADTKV_TM.Contact
         }
     }
 }
+//depois de receber maioria mandar msg de confirmacao
+//se correr mal mandar nack

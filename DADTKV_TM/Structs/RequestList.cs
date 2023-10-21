@@ -48,7 +48,8 @@ namespace DADTKV_TM.Structs
                 req.initialize(tnumber, _epoch);
                 if (!lease)
                 {
-                    _lmContact.RequestLease(req.Keys, tnumber);
+                    // Use of distinct because we only need one copy of each key
+                    _lmContact.RequestLease(req.Keys.Distinct().ToList(), tnumber, st);
                     req.Lease_number = tnumber;
                 }
                 buffer.Add(req);

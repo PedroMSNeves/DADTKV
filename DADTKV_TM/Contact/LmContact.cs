@@ -29,13 +29,13 @@ namespace DADTKV_TM.Contact
             }
 
         }
-        public bool RequestLease(List<string> keys, int leaseId)
+        public bool RequestLease(List<string> keys, int leaseId, Store st)
         {
-            LeaseReply reply;
+            List<Grpc.Core.AsyncUnaryCall<LeaseReply>> replies = new List<Grpc.Core.AsyncUnaryCall<LeaseReply>>();
             LeaseRequest request = new LeaseRequest { Id = _name, LeaseId = leaseId }; //cria request
             request.Keys.AddRange(keys);
             Console.WriteLine("REQUEST LEASE: " + request.ToString());
-
+            int acks = 0;
             if (lm_stubs == null)
             {
                 lm_stubs = new List<LeaseService.LeaseServiceClient>();
@@ -47,8 +47,26 @@ namespace DADTKV_TM.Contact
             foreach (LeaseService.LeaseServiceClient stub in lm_stubs)
             {
                 // Perguntar se basta receber ack de apenas 1 Lm, se precisamos de todos os ack ou uma maioria
-                reply = stub.LeaseAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();
+                replies.Add(stub.LeaseAsync(request));
             }
+            Random rd = new Random();
+            while (acks < lm_stubs.Count)
+            {
+                Monitor.Wait(st, rd.Next(100, 150));
+                for (int i = 0; i < replies.Count; i++)
+                {
+                    if (replies[i].ResponseAsync.IsCompleted)
+                    {
+                        if (replies[i].ResponseAsync.Result.Ack == true) acks++;
+                        replies.Remove(replies[i]);
+                        i--;
+                        if (acks == lm_stubs.Count) break;
+                    }
+                }
+                if (replies.Count == 0) break; //error
+            }
+            Console.Write("LEASE REQUEST CHEGOU AOS LMs? ");
+            Console.WriteLine(acks);
             return true;
         }
     }
