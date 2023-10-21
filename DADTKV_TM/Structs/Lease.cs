@@ -44,7 +44,11 @@
             if (Tm_name != other.Tm_name) return false;
             if (Epoch != other.Epoch) return false;
             if(Lease_number  != other.Lease_number) return false;
-            if(!Keys.Equals(other.Keys)) return false;
+            if(Keys.Count != other.Keys.Count) return false;
+            for (int i = 0; i < Keys.Count; i++)
+            {
+                if (!Keys[i].Equals(other.Keys[i])) return false;
+            }
 
             return true;
         }

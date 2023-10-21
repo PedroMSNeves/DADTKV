@@ -30,7 +30,7 @@ namespace DADTKV_TM.Impls
             {
                 foreach (LeaseProto lp in request.Leases)
                 {
-                    Console.WriteLine(lp.ToString());
+                    Console.WriteLine("LM: " + lp.ToString());
                     leases.Add(new FullLease(lp.Tm, request.Epoch, lp.Keys.ToList(), lp.LeaseId));
                 }
                 List<WaitLeases> remove = new List<WaitLeases>();
@@ -38,7 +38,7 @@ namespace DADTKV_TM.Impls
                 {
                     if (wl.Epoch == request.Epoch)
                     {
-                        if (wl.Leases.Equals(leases))
+                        if (Equal(wl.Leases,leases))
                         {
                             exists = true;
                             wl.increaseAcks();
@@ -53,8 +53,12 @@ namespace DADTKV_TM.Impls
                     if (_lm_count == 1) store.WaitLeases(leases, request.Epoch);
                     else waitLeases.Add(new WaitLeases(request.Epoch, leases));
                 }
+                Console.WriteLine("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+                Console.WriteLine(exists + " " +  ready);
+                //Console.ReadKey();
                 if (ready)
                 {
+                    Console.WriteLine("ADD NEW LEASES");
                     foreach (WaitLeases wl in remove) waitLeases.Remove(wl);
                     store.WaitLeases(leases, request.Epoch);
                 }
@@ -62,5 +66,16 @@ namespace DADTKV_TM.Impls
             }
             return new LeaseReply { Ack = true };
         }
+        public bool Equal(List<FullLease> others1, List<FullLease> others2)
+        {
+            if( others1.Count != others2.Count) return false;
+            for (int i = 0; i < others1.Count; i++)
+            {
+
+                if (!others1[i].Equal(others2[i])) return false;
+            }
+            return true;
+        }
+
     }
 }

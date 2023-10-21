@@ -39,6 +39,7 @@ namespace DADTKV_LM.Contact
                 foreach (string k in r.Keys) { lp.Keys.Add(k); }
                 request.Leases.Add(lp);
             }
+            Console.WriteLine(request.ToString());
 
             if (tm_stubs == null)
             {

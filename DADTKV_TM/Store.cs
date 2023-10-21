@@ -454,6 +454,7 @@ namespace DADTKV_TM
                     return;
                 }
                 // Adds this epoch
+                Console.WriteLine("ADD NEW LEASES");
                 NewLeases(leases, epoch);
 
                 List<int> remove = new List<int>();
