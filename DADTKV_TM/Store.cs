@@ -276,7 +276,7 @@ namespace DADTKV_TM
                     // Tries to propagate
                     Console.WriteLine("Request");
 
-                    int err = Request(reqs[i].Reads, reqs[i].Writes, fl, reqs[i].Epoch + 1, ref reply);
+                    int err = Request(reqs[i].Reads, reqs[i].Writes, fl, ref reply);
                     Console.WriteLine("Request END");
 
                     // Moves it to the pickup waiting place
@@ -307,14 +307,17 @@ namespace DADTKV_TM
         /// <param name="reply"></param>
         /// <param name="close"></param>
         /// <returns></returns>
-        public int Request(List<string> reads, List<DadIntProto> writes, FullLease fl, int epoch, ref List<DadIntProto> reply)
+        public int Request(List<string> reads, List<DadIntProto> writes, FullLease fl, ref List<DadIntProto> reply)
         {
             // If we have writes we use them to identify the lease to close (if needed)
             if(writes.Count != 0)
             {
                 // If lease is to close, we send the name, if not we send "_"
                 Console.WriteLine("BroadCastChanges");
-                if (!_tmContact.BroadCastChanges(writes, _name, epoch, this)) return -2;
+                bool ack = _tmContact.BroadCastChanges(_name, fl.Lease_number, fl.Epoch, this);
+                _tmContact.ConfirmBroadChanges(writes, ack);
+                if(!ack) return -2;
+
                 Console.WriteLine("BroadCastChanges END");
 
             }
@@ -363,6 +366,32 @@ namespace DADTKV_TM
             return true;
         }
         //////////////////////////////////////////////USED BY BROADSERVICE////////////////////////////////////////////////////////////
+        public bool TestWrite (string name, int leaseId, int epoch)
+        {
+            lock (this)
+            {
+                while (_reqList.get_epoch() < epoch) Monitor.Wait(this);
+                foreach(FullLease fullLease in _fullLeases)
+                {
+                    if(fullLease.Lease_number == leaseId && fullLease.Tm_name == name)
+                    {
+                        foreach (string key in fullLease.Keys)
+                        {
+                            // Verify if we have all parts of the lease at the top
+                            if (_leases[key].TryPeek(out var l))
+                            {
+                                // The lease at the top of a queue is not with our lease_number or our tm_name then we dont have a complete lease
+                                if (leaseId != l.Lease_number || l.Tm_name != name) return false;
+                            }
+                            else return false;
+                        }
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         /// <summary>
         /// Used by BroadService
         /// Writes the incoming changes and removes a lease if needed        
@@ -371,7 +400,7 @@ namespace DADTKV_TM
         /// <param name="tm_name"></param>
         /// <param name="epoch"></param>
         /// <returns></returns>
-        public bool Write(List<DadIntTmProto> writes, string tm_name, int epoch)
+        public bool Write(List<DadIntTmProto> writes)
         {
             Console.WriteLine("Write");
 
@@ -619,7 +648,7 @@ namespace DADTKV_TM
                 //Console.ReadKey();
                 bool[] bools = _tmContact.DeleteResidualKeys(leases, maxEpoch, this); // provavelmente ter uma array out para saber que leases podemos apagar
 
-                if (_tmContact.Confirm(_name, bools, maxEpoch))
+                if (_tmContact.ConfirmResidualDeletion(_name, bools, maxEpoch))
                 {
                     for (int i = 0; i < bools.Length; i++)
                     {

@@ -26,14 +26,15 @@ namespace DADTKV_TM.Contact
                 }
             }
         }
-        public bool BroadCastChanges(List<DadIntProto> writes, string name, int epoch, Store st)
+        public bool BroadCastChanges(string name, int leaseId, int epoch, Store st)
         {
             List<Grpc.Core.AsyncUnaryCall<BroadReply>> replies = new List<Grpc.Core.AsyncUnaryCall<BroadReply>>();
-            BroadRequest request = new BroadRequest { TmName = name, Epoch = epoch };
-            List<DadIntTmProto> writesTm = new List<DadIntTmProto>();
+            BroadRequest request = new BroadRequest { TmName = name, LeaseId = leaseId, Epoch = epoch };
+            //List<DadIntTmProto> writesTm = new List<DadIntTmProto>();
             int acks = 0;
-            foreach (DadIntProto tm in writes) writesTm.Add(new DadIntTmProto { Key = tm.Key, Value = tm.Value });
-            request.Writes.AddRange(writesTm);
+            int responses = 0;
+            //foreach (DadIntProto tm in writes) writesTm.Add(new DadIntTmProto { Key = tm.Key, Value = tm.Value });
+            //request.Writes.AddRange(writesTm);
 
             if (tm_stubs == null)
             {
@@ -49,7 +50,7 @@ namespace DADTKV_TM.Contact
                 replies.Add(stub.BroadCastAsync(request)); // tirar isto de syncrono
             }
             Random rd = new Random();
-            while (acks < tm_stubs.Count)
+            while (responses < tm_stubs.Count)
             {
                 Monitor.Wait(st, rd.Next(100, 150));
                 for (int i = 0; i < replies.Count; i++)
@@ -57,16 +58,17 @@ namespace DADTKV_TM.Contact
                     if (replies[i].ResponseAsync.IsCompleted)
                     {
                         if (replies[i].ResponseAsync.Result.Ack == true) acks++;
+                        responses++;
                         replies.Remove(replies[i]);
                         i--;
-                        if (acks == tm_stubs.Count) break;
+                        if (responses == tm_stubs.Count) break;
                     }
                 }
                 if (replies.Count == 0) break; //error
             }
             Console.Write("RESULTADO PROPAGATE CHEGOU AOS TMs? ");
             Console.WriteLine(acks);
-            return true;
+            return acks == tm_stubs.Count;
         }
         public bool[] DeleteResidualKeys(List<FullLease> residualLeases, int epoch, Store st) 
         {
@@ -127,16 +129,32 @@ namespace DADTKV_TM.Contact
             // for now returns always true
             return bools;
         }
-
-        public bool Confirm(string name, bool[] acks, int epoch)
+        public void ConfirmBroadChanges(List<DadIntProto> writes, bool ack)
         {
-            ConfirmRequest confirmRequest = new ConfirmRequest { TmName = name, Epoch = epoch };
+            if (!ack) return;
+            ConfirmBroadChangesRequest confirmRequest = new ConfirmBroadChangesRequest { Ack = ack };
+            // we have to order the leaseProtoTm list by the lease number
+            List<DadIntTmProto> writesTm = new List<DadIntTmProto>();
+            foreach (DadIntProto tm in writes) writesTm.Add(new DadIntTmProto { Key = tm.Key, Value = tm.Value });
+            confirmRequest.Writes.AddRange(writesTm);
+
+            foreach (BroadCastService.BroadCastServiceClient stub in tm_stubs)
+            {
+                stub.ConfirmBroadChangesAsync(confirmRequest); // tirar isto de syncrono
+            }
+
+            // for now returns always true
+            return;
+        }
+        public bool ConfirmResidualDeletion(string name, bool[] acks, int epoch)
+        {
+            ConfirmResidualDeletionRequest confirmRequest = new ConfirmResidualDeletionRequest { TmName = name, Epoch = epoch };
             confirmRequest.Bools.AddRange(acks);
             // we have to order the leaseProtoTm list by the lease number
 
             foreach (BroadCastService.BroadCastServiceClient stub in tm_stubs)
             {
-                stub.ConfirmAsync(confirmRequest); // tirar isto de syncrono
+                stub.ConfirmResidualDeletionAsync(confirmRequest); // tirar isto de syncrono
             }
 
             // for now returns always true

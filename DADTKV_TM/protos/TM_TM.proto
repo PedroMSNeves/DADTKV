@@ -12,8 +12,8 @@ message LeaseProtoTm {
 }
 
 message BroadRequest {
-	repeated DadIntTmProto writes = 1;
-	string tm_name = 2;
+	string tm_name = 1;
+	int32 leaseId = 2;
 	int32 epoch = 3;
 }
 
@@ -28,16 +28,21 @@ message ResidualReply {
 	repeated bool acks = 1;
 }
 
-message ConfirmRequest {
+message ConfirmResidualDeletionRequest {
 	string tm_name = 1;
 	repeated bool bools = 2;
 	int32 epoch = 3;
 }
-//mensagem especial para apenas eliminar leases
+
+message ConfirmBroadChangesRequest {
+	repeated DadIntTmProto writes = 1;
+	bool ack = 2;
+}
 
 service BroadCastService {
   rpc BroadCast (BroadRequest) returns (BroadReply);
   rpc ResidualDeletion (ResidualDeletionRequest) returns (ResidualReply);
-  rpc Confirm (ConfirmRequest) returns (BroadReply);
+  rpc ConfirmResidualDeletion (ConfirmResidualDeletionRequest) returns (BroadReply);
+  rpc ConfirmBroadChanges (ConfirmBroadChangesRequest) returns (BroadReply);
 
 }
