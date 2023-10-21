@@ -96,7 +96,7 @@ namespace DADTKV_LM.Contact
                 {
                     if (reply.ResponseAsync.Result.Ack) acks++;
                 }
-                catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded)
+                catch (RpcException ex) when (ex.StatusCode == StatusCode.Unavailable || ex.StatusCode == StatusCode.DeadlineExceeded)
                 {
                     Console.WriteLine("Could not contact LM");
                 }
