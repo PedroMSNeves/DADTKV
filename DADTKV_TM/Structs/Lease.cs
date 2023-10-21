@@ -38,6 +38,16 @@
         }
         public bool Contains(string key)
         { return Keys.Contains(key); }
+
+        public bool Equal (FullLease other)
+        {
+            if (Tm_name != other.Tm_name) return false;
+            if (Epoch != other.Epoch) return false;
+            if(Lease_number  != other.Lease_number) return false;
+            if(!Keys.Equals(other.Keys)) return false;
+
+            return true;
+        }
         public override string ToString() => $"({Tm_name}, {Epoch}, {End})";
     }
 

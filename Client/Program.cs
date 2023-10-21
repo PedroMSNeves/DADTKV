@@ -31,7 +31,7 @@
             {
                 string[] words = line.Split(' ');
                 if (words.Length == 0) break; //cheganis ai fim
-                if (words[0].Length != 1) exitOnError("Invalid command");
+                if (words[0].Length != 1 && words[0][0] != '#') exitOnError("Invalid command");
                 
                 char c = words[0][0];
                 switch (c)

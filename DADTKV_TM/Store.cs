@@ -17,6 +17,7 @@ namespace DADTKV_TM
         private RequestList _reqList; // Where Requests are stored
         private TmContact _tmContact; // Used to propagate things to other TM
         private bool possibleResiduals = false;
+        private Dictionary<int, List<FullLease>> _waitList;
         public Store(string name, List<string> tm_urls, List<string> lm_urls)
         {
             _reqList = new RequestList(10,name, lm_urls); // Maximum of requests waiting allowed and information necessary to ask for new leases
@@ -25,6 +26,7 @@ namespace DADTKV_TM
             _leases = new Dictionary<string, Queue<Lease>>(); // Stores the leases in a Lifo associated with a key (string)
             _tmContact = new TmContact(tm_urls);
             _fullLeases = new List<FullLease>();
+            _waitList = new Dictionary<int, List<FullLease>>();
         }
         //////////////////////////////////////////////USED BY SERVERSERVICE////////////////////////////////////////////////////////////
         /// <summary>
@@ -53,7 +55,7 @@ namespace DADTKV_TM
                 {
                     if (!_store.ContainsKey(write.Key)) 
                     { 
-                        _store[write.Key] = -1; //default value (will never be read) (maybe nao ness)
+                        //_store[write.Key] = -1; //default value (will never be read) (maybe nao ness)
                         _leases[write.Key] = new Queue<Lease>();  
                     } 
                 }
@@ -433,6 +435,44 @@ namespace DADTKV_TM
 
         //////////////////////////////////////////////USED BY LSERVICE////////////////////////////////////////////////////////////
         /// <summary>
+        /// Used to store batches of leases that cannot yet be added (mensage delay or multipaxos)
+        /// When able, adds all the batches possible
+        /// </summary>
+        /// <param name="leases"></param>
+        /// <param name="epoch"></param>
+        public void WaitLeases(List<FullLease> leases, int epoch)
+        {
+            lock (this)
+            {
+                //foreach (FullLease lease in _fullLeases) foreach (string key in lease.Keys) Console.WriteLine(key + ":" + lease.End);
+                //foreach (FullLease lease in leases) foreach (string key in lease.Keys) Console.WriteLine(key + ":" + lease.End);
+
+                // If it's not the epoch we want, we have to wait for it
+                if (epoch != _reqList.get_epoch() + 1)
+                {
+                    _waitList[epoch] = leases;
+                    return;
+                }
+                // Adds this epoch
+                NewLeases(leases, epoch);
+
+                List<int> remove = new List<int>();
+                // Adds next epochs (if possible)
+                foreach (int epochW in _waitList.Keys.OrderBy(num => num))
+                {
+                    if (epochW == _reqList.get_epoch() + 1)
+                    {
+                        NewLeases(leases, epoch);
+                        remove.Add(epochW);
+                    }
+                    else break;
+                }
+                foreach (int i in remove) _waitList.Remove(i);
+            }
+
+            //Console.ReadKey();
+        }
+        /// <summary>
         /// Used By LService
         /// Receives new leases for the epoch
         /// </summary>
@@ -442,52 +482,49 @@ namespace DADTKV_TM
         {
             Console.WriteLine("NewLeases");
 
-            lock (this)
+            //foreach (FullLease lease in _fullLeases) foreach (string key in lease.Keys) Console.WriteLine(key + ":" + lease.End);
+            //foreach (FullLease lease in leases) foreach (string key in lease.Keys) Console.WriteLine(key + ":" + lease.End);
+            foreach (FullLease fl in leases)
             {
-                //foreach (FullLease lease in _fullLeases) foreach (string key in lease.Keys) Console.WriteLine(key + ":" + lease.End);
-                //foreach (FullLease lease in leases) foreach (string key in lease.Keys) Console.WriteLine(key + ":" + lease.End);
-                foreach (FullLease fl in leases)
+                foreach(string  key in fl.Keys)
                 {
-                    foreach(string  key in fl.Keys)
+                    if(_leases.ContainsKey(key))
                     {
-                        if(_leases.ContainsKey(key))
+                        foreach (Lease l in _leases[key])
                         {
-                            foreach (Lease l in _leases[key])
+                            if (l.Tm_name == _name)
                             {
-                                if (l.Tm_name == _name)
-                                {
-                                    // Marks for end all our leases that have conflicts
-                                    l.End = true;
-                                }
+                                // Marks for end all our leases that have conflicts
+                                l.End = true;
                             }
                         }
-                        else
-                        {
-                            _leases[key] = new Queue<Lease>();
-                        }
-                        // Now the list and the queue are connected to the same lease object
-                        _leases[key].Enqueue(fl); // DownCast
                     }
-                    _fullLeases.Add(fl);
+                    else
+                    {
+                        _leases[key] = new Queue<Lease>();
+                    }
+                    // Now the list and the queue are connected to the same lease object
+                    _leases[key].Enqueue(fl); // DownCast
                 }
-                // Deletes residual leases
-                Console.WriteLine("DeleteResidualLeases");
-
-                //DeleteResidualLeases(epoch);
-                possibleResiduals = true;
-                Console.WriteLine("DeleteResidualLeases END");
-
-                // Raises epoch of new requests
-                Console.WriteLine("RaiseEpochOfNewRequests");
-
-                RaiseEpochOfNewRequests(epoch);
-                Console.WriteLine("RaiseEpochOfNewRequests END");
-
-                _reqList.incrementEpoch();
-                // Awakes possible waiting propagation thread
-                Monitor.PulseAll(this);
-                foreach (FullLease lease in _fullLeases) foreach (string key in lease.Keys) Console.WriteLine(key + ":" + lease.End);
+                _fullLeases.Add(fl);
             }
+            // Deletes residual leases
+            Console.WriteLine("DeleteResidualLeases");
+
+            //DeleteResidualLeases(epoch);
+            possibleResiduals = true;
+            Console.WriteLine("DeleteResidualLeases END");
+
+            // Raises epoch of new requests
+            Console.WriteLine("RaiseEpochOfNewRequests");
+
+            RaiseEpochOfNewRequests(epoch);
+            Console.WriteLine("RaiseEpochOfNewRequests END");
+
+            _reqList.incrementEpoch();
+            // Awakes possible waiting propagation thread
+            Monitor.PulseAll(this);
+            foreach (FullLease lease in _fullLeases) foreach (string key in lease.Keys) Console.WriteLine(key + ":" + lease.End);
 
             Console.WriteLine("NewLeases END");
             //Console.ReadKey();
