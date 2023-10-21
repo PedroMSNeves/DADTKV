@@ -87,11 +87,16 @@ namespace DADTKV_LM.Impls
                         if (Id == possible_leader + 1) // depois ver tambem se é o seguinte no bitmap que esteja vivo
                         {
                             ack = _lmcontact.getLeaderAck(_data.Possible_Leader); //Contact the leader to see if he is alive
+
+                            if (!ack)
+                            {
+                                possible_leader++;
+                                _data.IsLeader = true;
+                            }
                         }
                     }
                 }
                 if (_data.IsLeader) break;
-                else Thread.Sleep(100000);
             }
             for (int i = 0; i < numTimeSlots; i++)
             {
