@@ -10,23 +10,36 @@ namespace DADTKV_LM
     public class LeaseData
     {   /* se um lm morrer podemos ter bitmap dos lm vivos */
         List<Request> _requests = new List<Request>(); //requests received from TMs
+        private Dictionary<int, int> read_ts;
+        private Dictionary<int, int> write_ts;
 
         public LeaseData(bool leader)
         {
-            RoundID = 0;
-            Read_TS = 0;
-            Write_TS = 0;
             Possible_Leader = 0;
             IsLeader = leader;
+            read_ts = new Dictionary<int, int>();
+            write_ts = new Dictionary<int, int>();
+            RoundID = 0;
+            Epoch = 0;
         }
-
-        public int RoundID { set; get; }
-        public int IncrementRoundID()
+        public int Epoch { get; set; }
+        public int GetReadTS(int epoch) 
         {
-            return ++RoundID;
+            if (read_ts.ContainsKey(epoch)) return read_ts[epoch];
+            else return 0;
         }
-        public int Read_TS { get; set; }
-        public int Write_TS { get; set; }
+        public void SetReadTS(int epoch, int val) { read_ts[epoch] = val; }
+        public int GetWriteTS(int epoch) 
+        { 
+            if (write_ts.ContainsKey(epoch)) return write_ts[epoch];
+            else return 0; 
+        }
+        public void SetWriteTS(int epoch, int val) { write_ts[epoch] = val; }
+        public int RoundID { get; set; }
+        public int IncrementRoundID(int epoch)
+        {
+            return RoundID++;
+        }
         public int Possible_Leader { get; set; }
         public bool IsLeader { get; set; }
         public void AddRequest(Request request) //adds in the end

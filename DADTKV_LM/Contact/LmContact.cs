@@ -15,11 +15,11 @@ namespace DADTKV_LM.Contact
             _name = name;
             foreach (string url in lm_urls) lm_channels.Add(GrpcChannel.ForAddress(url));
         }
+        public int NumOfStubs() { return lm_channels.Count; }
 
-        public bool PrepareRequest(PrepareRequest request,int Write_TS, int Other_TS, List<Request> Others_value)
+        public Promise PrepareRequest(PrepareRequest request, int i)
         {
             Promise reply;
-            int promises = 1;
             if (lm_stubs == null)
             {
                 lm_stubs = new List<PaxosService.PaxosServiceClient>();
@@ -28,29 +28,25 @@ namespace DADTKV_LM.Contact
                     lm_stubs.Add(new PaxosService.PaxosServiceClient(channel));
                 }
             }
-            foreach (PaxosService.PaxosServiceClient stub in lm_stubs)
+            try
             {
-                reply = stub.PrepareAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
-                if (reply.Ack) promises++;
-
-                Other_TS = Write_TS;
-                if (reply.WriteTs > Other_TS)
-                {
-                    foreach (LeasePaxos l in reply.Leases)
-                    {
-                        Others_value.Add(new Request(l.Tm, l.Keys.ToList(), l.LeaseId));
-                    }
-                    Other_TS = reply.WriteTs;
-                }
+                Console.WriteLine("i: "+i);
+                Console.WriteLine(lm_stubs[i].ToString());
+                reply = lm_stubs[i].PrepareAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();
             }
-            return promises > (lm_stubs.Count + 1) / 2; //true se for maioria, removemos da lista se morrerem?
+            catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded || ex.StatusCode == StatusCode.Unavailable)// || ex.StatusCode == StatusCode.Unknown)
+            {
+                reply = new Promise { Ack = false };
+                Console.WriteLine("Erro ao contactar os outros LMs");
+            }
+
+            return reply;
         }
-        public bool BroadAccepted(AcceptRequest request)
+        public bool BroadAccepted(AcceptRequest request) //Used by the others to propagate accepted
         {
             List<int> values = new List<int>();
             values.Add(0);//ack counter
             values.Add(0);//nack counter
-
 
             if (lm_stubs == null)
             {
@@ -72,27 +68,44 @@ namespace DADTKV_LM.Contact
                 else return false;
             }
         }
-        public bool AcceptRequest(AcceptRequest request)
-        {
-            AcceptReply reply;
-            int acks = 1;
-            foreach (PaxosService.PaxosServiceClient stub in lm_stubs)
-            {
-                reply = stub.AcceptAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult(); // tirar isto de syncrono
-                if (reply.Ack) acks++;
-            }
-            return acks > (lm_stubs.Count + 1) / 2; //em vez do count vai ser com o bitmap dos lms que estao vivos
-        }
         private void sendAccepted(ref List<int> values, PaxosService.PaxosServiceClient stub, AcceptRequest request)
         {
-            AcceptReply reply = stub.AcceptedAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();
+            Console.WriteLine("NEW THREAD TO SEND ACCEPTED TO OTHERS");
+            AcceptReply reply = stub.AcceptedAsync(request).GetAwaiter().GetResult();
             lock (this)
             {
                 if (reply.Ack) values[0]++;
                 else values[1]++;
                 Monitor.Pulse(this);
             }
+            Console.WriteLine("ACCEPTED SENDED YES: " + values[0]);
+            Console.WriteLine("ACCEPTED SENDED NO: " + values[1]);
         }
+        public bool AcceptRequest(AcceptRequest request) //Used by the leaders to propagate accept 
+        {
+            Console.WriteLine("IN");
+            List<Grpc.Core.AsyncUnaryCall<AcceptReply>> replies = new List<Grpc.Core.AsyncUnaryCall<AcceptReply>>();
+            int acks = 1;
+            foreach (PaxosService.PaxosServiceClient stub in lm_stubs)
+            {
+                replies.Add(stub.AcceptAsync(request)); // tirar isto de syncrono
+            }
+            foreach (Grpc.Core.AsyncUnaryCall<AcceptReply> reply in replies)
+            {
+                try
+                {
+                    if (reply.ResponseAsync.Result.Ack) acks++;
+                }
+                catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded)
+                {
+                    Console.WriteLine("Could not contact LM");
+                }
+            }
+            Console.WriteLine("ACKS :" + acks);
+            Console.WriteLine("OUT");
+            return acks > (lm_stubs.Count + 1) / 2; //em vez do count vai ser com o bitmap dos lms que estao vivos
+        }
+       
         public bool getLeaderAck(int possible_leader)
         {
             if (lm_stubs == null) //É preciso?
@@ -103,7 +116,17 @@ namespace DADTKV_LM.Contact
                     lm_stubs.Add(new PaxosService.PaxosServiceClient(channel));
                 }
             }
-            return lm_stubs[possible_leader].GetLeaderAckAsync(new AckRequest(), new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult().Ack;  //fazer isto num try
+            AcceptReply reply;
+            try 
+            {
+                reply = lm_stubs[possible_leader].GetLeaderAckAsync(new AckRequest(), new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();
+            }
+            catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded || ex.StatusCode == StatusCode.Unavailable)
+            {
+                Console.WriteLine("Leader probably dead");
+                reply = new AcceptReply { Ack = false };
+            }
+            return reply.Ack;
         }
     }
 }

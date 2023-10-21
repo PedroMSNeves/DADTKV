@@ -2,6 +2,7 @@
 using Grpc.Core;
 using DADTKV_LM.Structs;
 using DADTKV_LM.Contact;
+using Grpc.Net.Client;
 
 namespace DADTKV_LM.Impls
 {
@@ -10,35 +11,74 @@ namespace DADTKV_LM.Impls
         private LeaseData _data;
         LmContact _lmcontact;
         TmContact _tmContact;
+        Dictionary<int, List<Request>> my_value;
+        Dictionary<int, List<Request>> other_value;
+        Dictionary<int, int> other_TS;
+
 
         public PaxosLeader(string name, LeaseData data, int id, List<string> tm_urls, List<string> lm_urls)
         {
             Name = name;
-            Others_value = new List<Request>();
-            Other_TS = 0;
             _data = data;
             Id = id;
-            Epoch = 0;
-            My_value = _data.GetMyValue();
+
             _tmContact = new TmContact(tm_urls);
             _lmcontact = new LmContact(name, lm_urls);
 
+            my_value = new Dictionary<int, List<Request>>();
+            other_value = new Dictionary<int, List<Request>>();
+            other_TS = new Dictionary<int, int>();
+
         }
         public string Name { get; }
-        public List<Request> My_value { set; get; }
-        public List<Request> Others_value { set; get; }
-        public int Other_TS { get; set; }
-        public int Id { get; set; }
-        public int Epoch { get; set; }
-
-        public void cycle()
+        public List<Request> GetMyValue(int epoch){ return my_value[epoch]; }
+        public void SetMyValue(int epoch, List<Request> req)
         {
+            if (my_value.ContainsKey(epoch))
+            {
+                my_value[epoch].Clear();
+                my_value[epoch].AddRange(req);
+            }
+            else
+            {
+                my_value.Add(epoch, req);
+            }
+        }
+        public List<Request> GetOtherValue(int epoch) { return other_value[epoch]; }
+        public void SetOtherValue(int epoch, List<Request> req)
+        {
+            if (other_value.ContainsKey(epoch))
+            {
+                other_value[epoch].Clear();
+                other_value[epoch].AddRange(req);
+            }
+            else
+            {
+                other_value.Add(epoch, req);
+            }
+        }
+        public int GetOtherTS(int epoch)
+        {
+            if (other_TS.ContainsKey(epoch)) return other_TS[epoch];
+            else return 0;
+        }
+        public void SetOtherTS(int epoch, int val) { other_TS[epoch] = val; }
+        public int Id { get; set; }
+
+        /// <summary>
+        /// LMs wait until they are leaders
+        /// </summary>
+        public void cycle(int timeSlotDuration, int numTimeSlots)
+        {
+            _data.Epoch = 1;
             bool ack = true;
             int possible_leader = -1;
-            while (true)
-            {
 
-                while (Id != possible_leader + 1 && ack)
+            while (true) //wait until you are the leader
+            {
+                Console.WriteLine("Possible Leader: " + possible_leader);
+                Console.WriteLine("Id: " + Id);
+                while (Id != possible_leader + 1 && ack) //if we are the next leader
                 {
                     Thread.Sleep(5000); //dorme 5 sec e depois manda mensagem
                     lock (_data)
@@ -46,55 +86,106 @@ namespace DADTKV_LM.Impls
                         possible_leader = _data.Possible_Leader;
                         if (Id == possible_leader + 1) // depois ver tambem se é o seguinte no bitmap que esteja vivo
                         {
-                            ack = _lmcontact.getLeaderAck(_data.Possible_Leader);
+                            ack = _lmcontact.getLeaderAck(_data.Possible_Leader); //Contact the leader to see if he is alive
                         }
                     }
                 }
-                lock (this)
-                {
-                    while (_data.IsLeader)
-                    {
-                        My_value = _data.GetMyValue();
-                        while (My_value.Count == 0)
-                        {
-                            Thread.Sleep(1000);
-                            My_value = _data.GetMyValue();
-                        }
-                        Epoch = Epoch + 1; //implementar tempo
-                        while (!PrepareRequest())
-                        {
-                            _data.RoundID = Other_TS + 1;//evitamos fazer muitas vezes inuteis
-                        }
-                        if (AcceptRequest())
-                        {
-                            _data.Write_TS = _data.RoundID;//evitamos fazer muitas vezes inuteis
-                                                           //eliminar os requests
-
-                            if (Other_TS > _data.Write_TS) _tmContact.BroadLease(Epoch, Others_value); //ver se correu bem, se não correu bem não aumenta a epoch?
-                            else _tmContact.BroadLease(Epoch, My_value);
-                            _data.Write_TS = _data.RoundID;
-
-                        }
-                        //x em x tempo faz
-                    }
-                }
-                possible_leader = Id;
+                if (_data.IsLeader) break;
+                else Thread.Sleep(100000);
+            }
+            for (int i = 0; i < numTimeSlots; i++)
+            {
+                Console.WriteLine("New Paxos Instance");
+                Thread t = new Thread(() => RunPaxosInstance(_data.Epoch));
+                t.Start();
+                Thread.Sleep(timeSlotDuration);
+                _data.Epoch++;
+                _data.RoundID++;
             }
         }
-        public bool PrepareRequest()
+        public void RunPaxosInstance(int epoch)
         {
-            PrepareRequest request = new PrepareRequest { RoundId = _data.IncrementRoundID() };
-            return _lmcontact.PrepareRequest(request, _data.Write_TS, Other_TS, Others_value);
-        }
-
-        public bool AcceptRequest()
-        {
-            AcceptRequest request = new AcceptRequest { WriteTs = _data.RoundID };
-            LeasePaxos lp;
-            //comparar os TS e ver qual vamos aceitar
-            if (Other_TS > _data.Write_TS)
+            int round_id;
+            lock (this)
             {
-                foreach (Request r in Others_value)
+                SetMyValue(epoch, _data.GetMyValue());
+
+                while (GetMyValue(epoch).Count == 0) //nao ter este while e mandar o paxos vazio?
+                {
+                    Thread.Sleep(1000);
+                    SetMyValue(epoch, _data.GetMyValue());
+                    Console.WriteLine("QUERO MAIS PEDIDOS");
+                }
+
+                while (!PrepareRequest(epoch))
+                {
+                    _data.RoundID = GetOtherTS(epoch) + 1;//evitamos fazer muitas vezes inuteis
+                }
+                round_id = _data.RoundID;
+            }
+
+                Console.WriteLine("PREPARE DONE");
+                if (AcceptRequest(epoch, round_id))
+                {
+                    Console.WriteLine("ACCEPT DONE");
+                    _data.SetWriteTS(epoch, round_id);
+
+                    if (other_TS[epoch] > _data.GetWriteTS(epoch))
+                    {
+                        _tmContact.BroadLease(epoch, other_value[epoch]); //ver se correu bem, se não correu bem não aumenta a epoch?
+                    }
+                    else _tmContact.BroadLease(epoch, my_value[epoch]);
+                    Console.WriteLine("BROADCASTED");
+                    _data.SetWriteTS(epoch, round_id);
+
+                }
+            _data.RoundID++;
+        }
+        public bool PrepareRequest(int epoch)
+        {
+            PrepareRequest request = new PrepareRequest { RoundId = _data.RoundID, Epoch = epoch };
+            return PrepareRequest(request, epoch);
+        }
+        public bool PrepareRequest(PrepareRequest request, int epoch)
+        {
+            bool res;
+            //lock (this)
+           //{
+                Promise reply;
+                int promises = 1;
+                int numLMs = _lmcontact.NumOfStubs();
+                Console.WriteLine("num Stubs: "+ numLMs);
+                for (int i = 0; i < numLMs; i++)
+                {
+                    reply = _lmcontact.PrepareRequest(request, i);
+                    if (reply.Ack) promises++;
+
+                    SetOtherTS(epoch, _data.GetWriteTS(epoch));
+                    if (reply.WriteTs > GetOtherTS(epoch))
+                    {
+                        if (other_value.ContainsKey(epoch)) other_value[epoch].Clear();
+                        foreach (LeasePaxos l in reply.Leases)
+                        {
+                            other_value[epoch].Add(new Request(l.Tm, l.Keys.ToList(), l.LeaseId));
+                        }
+                        SetOtherTS(epoch, reply.WriteTs);
+                    }
+                }
+                res = promises > (_lmcontact.lm_stubs.Count + 1) / 2;
+            Console.WriteLine("lider consegue prepare: "+res);
+           // }
+            return res;
+        }
+        public bool AcceptRequest(int epoch, int round_id)
+        {
+            Console.WriteLine("ACCEPT REQUEST");
+            Console.WriteLine("With: "+ round_id);
+            AcceptRequest request = new AcceptRequest { WriteTs = round_id, Epoch = epoch };
+            LeasePaxos lp;
+
+            if (GetOtherTS(epoch) > _data.GetWriteTS(epoch))
+            {
+                foreach (Request r in GetOtherValue(epoch))
                 {
                     lp = new LeasePaxos { Tm = r.Tm_name, LeaseId = r.Lease_ID };
                     foreach (string k in r.Keys) { lp.Keys.Add(k); }
@@ -103,7 +194,7 @@ namespace DADTKV_LM.Impls
             }
             else
             {
-                foreach (Request r in My_value)
+                foreach (Request r in GetMyValue(epoch))
                 {
                     lp = new LeasePaxos { Tm = r.Tm_name, LeaseId = r.Lease_ID };
                     foreach (string k in r.Keys) { lp.Keys.Add(k); }
@@ -112,7 +203,7 @@ namespace DADTKV_LM.Impls
             }
             request.LeaderId = Id;
             return _lmcontact.AcceptRequest(request);
-           
+
         }
     }
 }

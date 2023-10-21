@@ -27,22 +27,18 @@ namespace DADTKV_LM.Contact
         public bool BroadLease(int epoch, List<Request> leases)
         {
             List<Grpc.Core.AsyncUnaryCall<LeaseReply>> replies = new List<Grpc.Core.AsyncUnaryCall<LeaseReply>>();
-            LeaseBroadCastRequest request = new LeaseBroadCastRequest { Epoch = epoch }; //cria request
-                                                                                         //request.Leases.AddRange(leases);
+            LeaseBroadCastRequest request = new LeaseBroadCastRequest { Epoch = epoch };
 
             int acks = 0;
             Console.WriteLine(leases.Count);
             Console.WriteLine("sent");
-            //Thread.Sleep(50000);
-            foreach (Request r in leases) //as leases vem vazias
+
+            foreach (Request r in leases)
             {
                 LeaseProto lp = new LeaseProto { Tm = r.Tm_name, LeaseId = r.Lease_ID };
                 foreach (string k in r.Keys) { lp.Keys.Add(k); }
                 request.Leases.Add(lp);
             }
-            //LeaseProto xp = new LeaseProto { Tm = "tm1" };
-            //xp.Keys.Add("name3");
-            //request.Leases.Add( xp );
 
             if (tm_stubs == null)
             {
@@ -56,7 +52,7 @@ namespace DADTKV_LM.Contact
             foreach (LeaseService.LeaseServiceClient stub in tm_stubs)
             {
                 Console.WriteLine(request.Leases.Count);
-                replies.Add(stub.LeaseBroadCastAsync(request)); //fazer isto num try
+                replies.Add(stub.LeaseBroadCastAsync(request));
                 Console.WriteLine("DONE");
             }
             foreach (Grpc.Core.AsyncUnaryCall<LeaseReply> reply in replies)
@@ -67,7 +63,7 @@ namespace DADTKV_LM.Contact
                 }
                 catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded)
                 {
-                    Console.WriteLine("Greeting timeout.");
+                    Console.WriteLine("Could not contact TM");
                 }
             }
             Console.Write("RESULTADO PAXOS CHEGOU AOS TMs? ");

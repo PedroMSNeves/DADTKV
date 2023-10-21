@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 
 namespace ConfigParser
 {
@@ -47,18 +47,18 @@ namespace ConfigParser
                 args += $" {leaseManager}";
             }
 
-            Console.WriteLine($"Launching Transaction Manager {id} with url {url}");
+            Console.WriteLine($"Launching Transaction Manager {id} with args: {args}");
             Process server = createProcess("DADTKV_TM", $"{id} {url} {args}");
             server.Start();
         }
 
-        public static void launchLeaseManager(string id, int paxos_id, string url, List<string> transactionManagers, List<string> leaseManagers)
+        public static void launchLeaseManager(string id, int paxos_id, string url, int numTimeSlots, string startingTime, int timeSlotDuration, List<string> transactionManagers, List<string> leaseManagers)
         {
-            string args = $"{paxos_id}";
+            string args = $"{paxos_id} {numTimeSlots} {startingTime} {timeSlotDuration}";
             // Pass all Lease Manager URLs to the Lease Manager
             foreach (string leaseManager in leaseManagers)
             {
-                if (leaseManager != url)  args += $" {leaseManager}";
+                if (leaseManager != url) args += $" {leaseManager}";
             }
 
             args += " TM";
@@ -69,12 +69,16 @@ namespace ConfigParser
                 args += $" {transactionManager}";
             }
 
-            Console.WriteLine($"Launching Lease Manager {id} with url {url}");
+            Console.WriteLine($"Launching Lease Manager {id} with args: {args}");
             Process server = createProcess("DADTKV_LM", $"{id} {url} {args}");
             server.Start();
         }
         public static void Main(string[] args)
         {
+            int numTimeSlots = 0;
+            string startingTime = "00:00:00";
+            int timeSlotDuration = 0;
+
             // Save server IDs and URLs to pass onto the clients
             Dictionary<string, string> transactionManagers = new Dictionary<string, string>();
             Dictionary<string, string> leaseManagers = new Dictionary<string, string>();
@@ -123,19 +127,19 @@ namespace ConfigParser
                 // Number of time slots
                 else if (words[0] == "S")
                 {
-                    int numTimeSlots = Int32.Parse(words[1]);
+                    numTimeSlots = Int32.Parse(words[1]);
                 }
 
                 // Starting physical wall time
                 else if (words[0] == "T")
                 {
-                    string startingTime = words[1];
+                    startingTime = words[1];
                 }
 
                 // Time slot duration
                 else if (words[0] == "D")
                 {
-                    int timeSlotDuration = Int32.Parse(words[1]);
+                    timeSlotDuration = Int32.Parse(words[1]);
                 }
 
                 // Server state
@@ -150,7 +154,7 @@ namespace ConfigParser
             int paxos_id = 0;
             foreach (KeyValuePair<string, string> leaseManager in leaseManagers)
             {
-                launchLeaseManager(leaseManager.Key, paxos_id++, leaseManager.Value, transactionManagers.Values.ToList(), leaseManagers.Values.ToList());
+                launchLeaseManager(leaseManager.Key, paxos_id++, leaseManager.Value, numTimeSlots, startingTime, timeSlotDuration, transactionManagers.Values.ToList(), leaseManagers.Values.ToList());
             }
             // Launch all servers
             foreach (KeyValuePair<string, string> transactionManager in transactionManagers)
