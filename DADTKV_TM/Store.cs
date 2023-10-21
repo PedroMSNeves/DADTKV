@@ -340,26 +340,26 @@ namespace DADTKV_TM
         /// <param name="firstkey"></param>
         /// <param name="tm_name"></param>
         /// <returns></returns>
-        public bool LeaseRemove(string firstkey, string tm_name)
+        public bool LeaseRemove(FullLease lease)
         {
-            FullLease fl;
-            if (_leases[firstkey].TryPeek(out var lease)) fl = (FullLease)lease; // Gets FullLease
-            else return false; // Theoretically never possible
+            //if (_leases[firstkey].TryPeek(out var lease)) fl = (FullLease)lease; // Gets FullLease
+            //else return false; // Theoretically never possible
             // Verify all entries
-            foreach (string key in fl.Keys)
+            /*foreach (string key in lease.Keys)
             {
                 if (_leases[key].TryPeek(out var result))
                 {
-                    if (result.Tm_name != tm_name) return false; // Theoretically never possible
+                    if (result.Tm_name != _name && result.Lease_number != lease.Lease_number) return false; 
                 }
-                else return false; // Theoretically never possible
-            }
+                else return false;
+            }*/
+
             // Remove all entries
-            foreach (string key in fl.Keys)
+            foreach (string key in lease.Keys)
             {
                 _leases[key].Dequeue(); // Removes queue entries
             }
-            _fullLeases.Remove(fl); // Removes lease list entry
+            _fullLeases.Remove(lease); // Removes lease list entry
             return true;
         }
         //////////////////////////////////////////////USED BY BROADSERVICE////////////////////////////////////////////////////////////
@@ -390,15 +390,22 @@ namespace DADTKV_TM
         /// <param name="name"></param>
         /// <param name="epoch"></param>
         /// <returns></returns>
-        public bool DeleteResidual(List<string> firstKeys, string name, int epoch)
+        public bool[] DeleteResidual(List<LeaseProtoTm> residualLeases, int epoch)
         {
-            foreach (string key in firstKeys)
+            bool[] residual = new bool[residualLeases.Count];
+            lock (this)
             {
-                Console.WriteLine("LeaseRemove");
-                LeaseRemove(key, name, epoch);
-                Console.WriteLine("LeaseRemove END");
+                for (int i = 0; i < residualLeases.Count; i++)
+                {
+                    Console.WriteLine("LeaseRemove");
+                    if (LeaseTest(residualLeases[i], epoch)) residual[i] = true;
+                    else residual[i] = false;
+                    Console.WriteLine("LeaseRemove END");
+                }
             }
-            return true;
+            
+
+            return residual;
         }
         /// <summary>
         /// Remove the Lease that is on top of the queue for the first key (waits if this tm did not receive this epoch's leases)
@@ -407,30 +414,49 @@ namespace DADTKV_TM
         /// <param name="tm_name"></param>
         /// <param name="epoch"></param>
         /// <returns></returns>
-        public bool LeaseRemove(string firstkey, string tm_name, int epoch)
+        public bool LeaseTest(LeaseProtoTm lease, int epoch)
         {
-            FullLease fl;
+            FullLease fl = null;
             while (_reqList.get_epoch() < epoch) Monitor.Wait(this);
-            if (_leases[firstkey].TryPeek(out var lease)) fl = (FullLease)lease; // Gets FullLease
-            else return false; // Theoretically never possible
+
 
             // Verify all entries
-            foreach (string key in fl.Keys)
+            foreach (string key in lease.Keys)
             {
                 if (_leases[key].TryPeek(out var result))
                 {
-                    if (result.Tm_name != tm_name) return false; // Theoretically never possible
+                    if (result.Tm_name != lease.Tm || result.Lease_number != lease.LeaseId) return false; // Theoretically never possible
+                    fl = (FullLease) result;
                 }
                 else return false; // Theoretically never possible
             }
 
-            // Remove all entries
-            foreach (string key in fl.Keys)
-            {
-                _leases[key].Dequeue(); // Removes queue entries
-            }
-            _fullLeases.Remove(fl); // Removes lease list entry
+            if (fl == null) return false;
+            // guardar e depois da confirmacao e que apagamos
             return true;
+        }
+        public void LeaseRemove(LeaseProtoTm lease, int epoch)
+        {
+            FullLease fl = null;
+            lock (this)
+            {
+                while (_reqList.get_epoch() < epoch) Monitor.Wait(this);
+                foreach (FullLease fullLease in _fullLeases)
+                {
+                    if (fullLease.Lease_number == lease.LeaseId && fullLease.Tm_name == lease.Tm)
+                    {
+                        fl = fullLease;
+                        break;
+                    }
+                }
+                if (fl == null) return;
+                // Remove all entries
+                foreach (string key in lease.Keys)
+                {
+                    _leases[key].Dequeue(); // Removes queue entries
+                }
+                _fullLeases.Remove(fl); // Removes lease list entry
+            }
         }
 
         //////////////////////////////////////////////USED BY LSERVICE////////////////////////////////////////////////////////////
@@ -564,7 +590,7 @@ namespace DADTKV_TM
                 //if (!possibleResiduals) return;
                 bool used = false;
                 int maxEpoch = 0;
-                List<string> firstKeys = new List<string>();
+                List<FullLease> leases = new List<FullLease>();
                 foreach (FullLease fullLease in _fullLeases.ToList())
                 {
                     if(fullLease.Tm_name == _name && fullLease.End)
@@ -581,25 +607,27 @@ namespace DADTKV_TM
                         if (!used)
                         {
                             if (fullLease.Epoch > maxEpoch) maxEpoch = fullLease.Epoch;
-                            firstKeys.Add(fullLease.Keys[0]);
+                            leases.Add(fullLease);
                         }
                     }
                     used = false;
                 }
-                if (firstKeys.Count == 0) return;
+                if (leases.Count == 0) return;
                 Console.WriteLine("APAGAR LEASES RESIDUAIS: ");
-                foreach (string key in firstKeys) Console.WriteLine(key + " ");
+                //foreach (string key in leases) Console.WriteLine(key + " ");
                 Console.WriteLine();
                 //Console.ReadKey();
-                if (_tmContact.DeleteResidualKeys(firstKeys, _name, maxEpoch, this))
+                bool[] bools = _tmContact.DeleteResidualKeys(leases, maxEpoch, this); // provavelmente ter uma array out para saber que leases podemos apagar
+
+                if (_tmContact.Confirm(_name, bools, maxEpoch))
                 {
-                    foreach(string key in firstKeys)
+                    for (int i = 0; i < bools.Length; i++)
                     {
-                        LeaseRemove(key, _name);
+                        if (bools[i]) LeaseRemove(leases[i]);
                     }
                 }
             }
-            possibleResiduals = false;
+            //possibleResiduals = false;
             Console.WriteLine("RemoveResidual END");
         }
     }

@@ -1,4 +1,5 @@
-﻿using Grpc.Core;
+﻿using DADTKV_TM.Structs;
+using Grpc.Core;
 using Grpc.Net.Client;
 
 namespace DADTKV_TM.Contact
@@ -67,12 +68,21 @@ namespace DADTKV_TM.Contact
             Console.WriteLine(acks);
             return true;
         }
-        public bool DeleteResidualKeys(List<string> residualKeys , string name, int epoch, Store st) 
+        public bool[] DeleteResidualKeys(List<FullLease> residualLeases, int epoch, Store st) 
         {
-            List<Grpc.Core.AsyncUnaryCall<BroadReply>> replies = new List<Grpc.Core.AsyncUnaryCall<BroadReply>>();
-            ResidualDeletionRequest residualDeletionRequest = new ResidualDeletionRequest { TmName = name, Epoch = epoch };
-            int acks = 0;
-            residualDeletionRequest.FirstKeys.AddRange(residualKeys);
+            List<Grpc.Core.AsyncUnaryCall<ResidualReply>> replies = new List<Grpc.Core.AsyncUnaryCall<ResidualReply>>();
+            ResidualDeletionRequest residualDeletionRequest = new ResidualDeletionRequest { Epoch = epoch };
+            int responses = 0;
+            int[] acks = new int[residualLeases.Count];
+            for (int i = 0; i < acks.Length; i++) acks[i] = 0;
+
+            foreach (FullLease lease in residualLeases) 
+            {
+                LeaseProtoTm leaseProtoTm = new LeaseProtoTm { LeaseId = lease.Lease_number, Tm = lease.Tm_name };
+                leaseProtoTm.Keys.AddRange(lease.Keys);
+                residualDeletionRequest.ResidualLeases.Add(leaseProtoTm);
+            }
+            // we have to order the leaseProtoTm list by the lease number
             if (tm_stubs == null)
             {
                 tm_stubs = new List<BroadCastService.BroadCastServiceClient>();
@@ -86,23 +96,48 @@ namespace DADTKV_TM.Contact
                 replies.Add(stub.ResidualDeletionAsync(residualDeletionRequest)); // tirar isto de syncrono
             }
             Random rd = new Random();
-            while (acks < tm_stubs.Count)
+            while (responses < tm_stubs.Count) // depois meter maioria
             {
                 Monitor.Wait(st, rd.Next(100, 150));
                 for (int i = 0; i < replies.Count; i++)
                 {
                     if (replies[i].ResponseAsync.IsCompleted)
                     {
-                        if (replies[i].ResponseAsync.Result.Ack == true) acks++;
+                        if (replies[i].ResponseAsync.IsCompletedSuccessfully)
+                        {
+                            for (int j = 0; j < acks.Length; j++) if(replies[i].ResponseAsync.Result.Acks[i]) acks[j]++;
+                        }
+                        responses++;
                         replies.Remove(replies[i]);
                         i--;
-                        if (acks == tm_stubs.Count) break;
+                        if (responses == tm_stubs.Count) break;
                     }
                 }
                 if (replies.Count == 0) break; //error
             }
             Console.Write("RESULTADO Residual Lease CHEGOU AOS TMs? ");
-            Console.WriteLine(acks);
+            Console.WriteLine(responses);
+            foreach (int i in acks) Console.Write(i + " ");
+            bool[] bools = new bool[residualLeases.Count];
+            for (int i = 0; i < acks.Length; i++)
+            {
+                if (acks[i] == tm_stubs.Count) bools[i] = true;
+                else bools[i] = false;
+            }
+            // for now returns always true
+            return bools;
+        }
+
+        public bool Confirm(string name, bool[] acks, int epoch)
+        {
+            ConfirmRequest confirmRequest = new ConfirmRequest { TmName = name, Epoch = epoch };
+            confirmRequest.Bools.AddRange(acks);
+            // we have to order the leaseProtoTm list by the lease number
+
+            foreach (BroadCastService.BroadCastServiceClient stub in tm_stubs)
+            {
+                stub.ConfirmAsync(confirmRequest); // tirar isto de syncrono
+            }
 
             // for now returns always true
             return true;
