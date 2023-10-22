@@ -28,6 +28,7 @@ namespace DADTKV_TM.Impls
             bool exists = false;
             lock (waitLeases)
             {
+                Console.WriteLine("EPOCH: " + request.Epoch);
                 foreach (LeaseProto lp in request.Leases)
                 {
                     Console.WriteLine("LM: " + lp.ToString());
