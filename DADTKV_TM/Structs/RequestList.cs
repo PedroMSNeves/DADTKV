@@ -45,7 +45,7 @@ namespace DADTKV_TM.Structs
 
                 while (buzy == MAX) Monitor.Wait(st);
                 tnumber = transaction_number++;
-                req.initialize(tnumber, _epoch);
+                req.initialize(tnumber);
                 if (!lease)
                 {
                     // Use of distinct because we only need one copy of each key

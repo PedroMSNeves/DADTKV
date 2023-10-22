@@ -11,6 +11,7 @@ namespace DADTKV_TM.Contact
     {
         List<BroadCastService.BroadCastServiceClient> tm_stubs = null;
         List<GrpcChannel> tm_channels = new List<GrpcChannel>();
+        bool[] bitmap;
 
         public TmContact(List<string> tm_urls)
         {
@@ -25,13 +26,15 @@ namespace DADTKV_TM.Contact
                     Console.WriteLine("ERROR: Invalid Tm server url");
                 }
             }
+            bitmap = new bool[tm_channels.Count];
+            for (int i = 0; i < bitmap.Length; i++) bitmap[i] = true;
         }
         public bool BroadCastChanges(string name, int leaseId, int epoch, Store st)
         {
             List<Grpc.Core.AsyncUnaryCall<BroadReply>> replies = new List<Grpc.Core.AsyncUnaryCall<BroadReply>>();
             BroadRequest request = new BroadRequest { TmName = name, LeaseId = leaseId, Epoch = epoch };
             //List<DadIntTmProto> writesTm = new List<DadIntTmProto>();
-            int acks = 0;
+            int acks = 1;
             int responses = 0;
             //foreach (DadIntProto tm in writes) writesTm.Add(new DadIntTmProto { Key = tm.Key, Value = tm.Value });
             //request.Writes.AddRange(writesTm);
@@ -44,31 +47,49 @@ namespace DADTKV_TM.Contact
                     tm_stubs.Add(new BroadCastService.BroadCastServiceClient(channel));
                 }
             }
-
-            foreach (BroadCastService.BroadCastServiceClient stub in tm_stubs)
+            if (LmAlive() <= Majority()) { return false; }
+            for (int i = 0; i < tm_stubs.Count; i++)
             {
-                replies.Add(stub.BroadCastAsync(request)); // tirar isto de syncrono
+                if (bitmap[i])
+                {
+                    replies.Add(tm_stubs[i].BroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
+                }
+                else replies.Add(null);
             }
             Random rd = new Random();
-            while (responses < tm_stubs.Count)
+            while (responses < tm_stubs.Count && acks <= Majority())
             {
                 Monitor.Wait(st, rd.Next(100, 150));
                 for (int i = 0; i < replies.Count; i++)
                 {
-                    if (replies[i].ResponseAsync.IsCompleted)
+                    if (replies[i] != null)
                     {
-                        if (replies[i].ResponseAsync.Result.Ack == true) acks++;
+                        if (replies[i].ResponseAsync.IsCompleted)
+                        {
+                            if (replies[i].ResponseAsync.IsFaulted)
+                            {
+                                bitmap[i] = false;
+                            }
+                            else if (replies[i].ResponseAsync.Result.Ack == true) acks++;
+                            responses++;
+                            replies.Remove(replies[i]);
+                            i--;
+                            if (acks > Majority()) break;
+                        }
+                    }
+                    else
+                    {
                         responses++;
                         replies.Remove(replies[i]);
                         i--;
-                        if (responses == tm_stubs.Count) break;
                     }
+                   
                 }
-                if (replies.Count == 0) break; //error
             }
             Console.Write("RESULTADO PROPAGATE CHEGOU AOS TMs? ");
             Console.WriteLine(acks);
-            return acks == tm_stubs.Count;
+
+            return acks > Majority();
         }
         public bool[] DeleteResidualKeys(List<FullLease> residualLeases, int epoch, Store st) 
         {
@@ -93,29 +114,46 @@ namespace DADTKV_TM.Contact
                     tm_stubs.Add(new BroadCastService.BroadCastServiceClient(channel));
                 }
             }
-            foreach (BroadCastService.BroadCastServiceClient stub in tm_stubs)
+            if (LmAlive() <= Majority()) { return null; }
+            for (int i = 0; i < tm_stubs.Count; i++)
             {
-                replies.Add(stub.ResidualDeletionAsync(residualDeletionRequest)); // tirar isto de syncrono
+                if (bitmap[i])
+                {
+                    replies.Add(tm_stubs[i].ResidualDeletionAsync(residualDeletionRequest, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
+                }
+                else replies.Add(null);
             }
             Random rd = new Random();
-            while (responses < tm_stubs.Count) // depois meter maioria
+            while (responses < tm_stubs.Count)
             {
                 Monitor.Wait(st, rd.Next(100, 150));
                 for (int i = 0; i < replies.Count; i++)
                 {
-                    if (replies[i].ResponseAsync.IsCompleted)
+                    if (replies[i] != null)
                     {
-                        if (replies[i].ResponseAsync.IsCompletedSuccessfully)
+                        if (replies[i].ResponseAsync.IsCompleted)
                         {
-                            for (int j = 0; j < acks.Length; j++) if(replies[i].ResponseAsync.Result.Acks[i]) acks[j]++;
+                            if (replies[i].ResponseAsync.IsFaulted)
+                            {
+                                bitmap[i] = false;
+                            }
+                            else if (replies[i].ResponseAsync.IsCompletedSuccessfully)
+                            {
+                                for (int j = 0; j < acks.Length; j++) if (replies[i].ResponseAsync.Result.Acks[i]) acks[j]++;
+                            }
+                            responses++;
+                            replies.Remove(replies[i]);
+                            i--;
+                            if (responses == tm_stubs.Count) break;
                         }
+                    }
+                    else 
+                    {
                         responses++;
                         replies.Remove(replies[i]);
                         i--;
-                        if (responses == tm_stubs.Count) break;
                     }
                 }
-                if (replies.Count == 0) break; //error
             }
             Console.Write("RESULTADO Residual Lease CHEGOU AOS TMs? ");
             Console.WriteLine(responses);
@@ -123,7 +161,7 @@ namespace DADTKV_TM.Contact
             bool[] bools = new bool[residualLeases.Count];
             for (int i = 0; i < acks.Length; i++)
             {
-                if (acks[i] == tm_stubs.Count) bools[i] = true;
+                if (acks[i] > Majority()) bools[i] = true;
                 else bools[i] = false;
             }
             // for now returns always true
@@ -159,6 +197,16 @@ namespace DADTKV_TM.Contact
 
             // for now returns always true
             return true;
+        }
+        private int Majority()
+        {
+            return (int)Math.Floor((decimal)((tm_stubs.Count + 1) / 2)); // perguntar se é dos vivos ou do total
+        }
+        private int LmAlive()
+        {
+            int count = 1;
+            foreach (bool b in bitmap) if (b) count++;
+            return count;
         }
     }
 }

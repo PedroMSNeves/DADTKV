@@ -16,11 +16,9 @@
         public int Transaction_number { set; get; }
         public int Lease_number { set;  get; }
         public List<string> Keys { get; }
-        public int Epoch { set; get; }
 
-        public void initialize (int transaction_number, int epoch)
+        public void initialize (int transaction_number)
         {
-            Epoch = epoch;
             Transaction_number = transaction_number;
         }
 

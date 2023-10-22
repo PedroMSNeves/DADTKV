@@ -571,12 +571,6 @@ namespace DADTKV_TM
             possibleResiduals = true;
             Console.WriteLine("DeleteResidualLeases END");
 
-            // Raises epoch of new requests
-            Console.WriteLine("RaiseEpochOfNewRequests");
-
-            RaiseEpochOfNewRequests(epoch);
-            Console.WriteLine("RaiseEpochOfNewRequests END");
-
             _reqList.incrementEpoch();
             // Awakes possible waiting propagation thread
             Monitor.PulseAll(this);
@@ -584,33 +578,6 @@ namespace DADTKV_TM
 
             Console.WriteLine("NewLeases END");
             //Console.ReadKey();
-        }
-
-        private void RaiseEpochOfNewRequests(int epoch)
-        {
-            /* EX: We have to raise the epoch number of the requests that did not receive a lease in this epoch 
-             * EpochM: 0     0    0     0        1     1     1    1         1      1
-             *       <A,I> <A,B> <P> <A,B,K>  <A,B,C> <C,D> <X> <X,K>    <A,B,C> <C,D>
-             *          1º epoch             | 2º epoch               |  3º epoch 
-             */
-            foreach(Request rq in _reqList.GetRequestsNow())
-            {
-                bool exists = false;
-                foreach (FullLease fl in _fullLeases)
-                {
-                    if (rq.Lease_number == fl.Lease_number)
-                    {
-                        exists = true;
-                        break;
-                    }
-                }
-                if (!exists) rq.Epoch = epoch;
-            }
-            /* EX: We have to raise the epoch number of the requests that did not receive a lease in this epoch 
-             * EpochM: 0     0    0     0        1     1     1    1         2      2
-             *       <A,I> <A,B> <P> <A,B,K>  <A,B,C> <C,D> <X> <X,K>    <A,B,C> <C,D>
-             *          1º epoch             | 2º epoch               |  3º epoch 
-             */
         }
         public void removeResidual()
         {
@@ -647,6 +614,7 @@ namespace DADTKV_TM
                 Console.WriteLine();
                 //Console.ReadKey();
                 bool[] bools = _tmContact.DeleteResidualKeys(leases, maxEpoch, this); // provavelmente ter uma array out para saber que leases podemos apagar
+                if (bools == null) return;
 
                 if (_tmContact.ConfirmResidualDeletion(_name, bools, maxEpoch))
                 {

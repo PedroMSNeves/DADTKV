@@ -42,7 +42,7 @@ namespace DADTKV_TM.Impls
                         {
                             exists = true;
                             wl.increaseAcks();
-                            if (wl.Acks == _lm_count) ready = true;
+                            if (wl.Acks > Majority()) ready = true;
                         }
                         remove.Add(wl);
                     }
@@ -53,7 +53,6 @@ namespace DADTKV_TM.Impls
                     if (_lm_count == 1) store.WaitLeases(leases, request.Epoch);
                     else waitLeases.Add(new WaitLeases(request.Epoch, leases));
                 }
-                Console.WriteLine("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
                 Console.WriteLine(exists + " " +  ready);
                 //Console.ReadKey();
                 if (ready)
@@ -75,6 +74,10 @@ namespace DADTKV_TM.Impls
                 if (!others1[i].Equal(others2[i])) return false;
             }
             return true;
+        }
+        private int Majority()
+        {
+            return (int)Math.Floor((decimal)((_lm_count) / 2)); // perguntar se é dos vivos ou do total
         }
 
     }

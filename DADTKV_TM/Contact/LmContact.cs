@@ -11,6 +11,7 @@ namespace DADTKV_TM.Contact
     {
         private string _name;
         List<LeaseService.LeaseServiceClient> lm_stubs = null;
+        bool[] bitmap;
         List<GrpcChannel> lm_channels = new List<GrpcChannel>();
 
         public LmContact(string name, List<string> lm_urls)
@@ -27,7 +28,8 @@ namespace DADTKV_TM.Contact
                     Console.WriteLine("ERROR: Invalid Lm server url");
                 }
             }
-
+            bitmap = new bool[lm_channels.Count];
+            for (int i = 0; i < bitmap.Length; i++) bitmap[i] = true;
         }
         public bool RequestLease(List<string> keys, int leaseId, Store st)
         {
@@ -36,6 +38,7 @@ namespace DADTKV_TM.Contact
             request.Keys.AddRange(keys);
             Console.WriteLine("REQUEST LEASE: " + request.ToString());
             int acks = 0;
+            int responses = 0;
             if (lm_stubs == null)
             {
                 lm_stubs = new List<LeaseService.LeaseServiceClient>();
@@ -44,30 +47,62 @@ namespace DADTKV_TM.Contact
                     lm_stubs.Add(new LeaseService.LeaseServiceClient(channel));
                 }
             }
-            foreach (LeaseService.LeaseServiceClient stub in lm_stubs)
+            if(LmAlive() <= Majority()) { return false; }
+            for (int i = 0; i < lm_stubs.Count; i++)
             {
-                // Perguntar se basta receber ack de apenas 1 Lm, se precisamos de todos os ack ou uma maioria
-                replies.Add(stub.LeaseAsync(request));
+                if (bitmap[i])
+                {
+                    replies.Add(lm_stubs[i].LeaseAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
+                }
+                else replies.Add(null);
             }
-            Random rd = new Random();
-            while (acks < lm_stubs.Count)
+            while (responses < lm_stubs.Count && acks <= Majority())
             {
                 //Monitor.Wait(st, rd.Next(100, 150));
                 for (int i = 0; i < replies.Count; i++)
                 {
-                    if (replies[i].ResponseAsync.IsCompleted)
+                    if (replies[i] != null)
                     {
-                        if (replies[i].ResponseAsync.Result.Ack == true) acks++;
+                        if (replies[i].ResponseAsync.IsCompleted)
+                        {
+                            if (replies[i].ResponseAsync.IsFaulted)
+                            {
+                                bitmap[i] = false;
+                            }
+                            else if (replies[i].ResponseAsync.Result.Ack == true)
+                            {
+                                acks++;
+                            }
+                            responses++;
+                            replies.Remove(replies[i]);
+                            i--;
+                            if (acks > Majority()) break;
+                        }
+                    } 
+                    else
+                    {
+                        responses++;
                         replies.Remove(replies[i]);
                         i--;
-                        if (acks == lm_stubs.Count) break;
+                        if (acks > Majority()) break;
                     }
                 }
-                if (replies.Count == 0) break; //error
             }
+
+            // Confirmation(_name, leaseId, acks > Majority());
             Console.Write("LEASE REQUEST CHEGOU AOS LMs? ");
             Console.WriteLine(acks);
-            return true;
+            return acks > Majority();
+        }
+        private int Majority()
+        {            
+            return (int) Math.Floor((decimal)((lm_stubs.Count)/2)); // perguntar se é dos vivos ou do total
+        }
+        private int LmAlive()
+        {
+            int count = 0;
+            foreach (bool b in bitmap) if (b) count++;
+            return count;
         }
     }
 }
