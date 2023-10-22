@@ -159,9 +159,9 @@ namespace DADTKV_LM.Impls
            //{
                 Promise reply;
                 int promises = 1;
-                int numLMs = _lmcontact.TotalNumLMs();
+                int numLMs = _lmcontact.NumLMs();
                 Console.WriteLine("num Stubs: "+ numLMs);
-
+                
                 for (int i = 0; i < numLMs; i++)
                 {
                     reply = _lmcontact.PrepareRequest(request, i);
@@ -178,7 +178,7 @@ namespace DADTKV_LM.Impls
                         SetOtherTS(epoch, reply.WriteTs);
                     }
                 }
-                res = promises > (_lmcontact.AliveLMs() + 1) / 2;
+                res = promises > (numLMs + 1) / 2;
             Console.WriteLine("lider consegue prepare: "+res);
            // }
             return res;

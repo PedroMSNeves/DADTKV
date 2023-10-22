@@ -9,6 +9,7 @@ namespace DADTKV_LM.Contact
     {
         List<LeaseService.LeaseServiceClient> tm_stubs = null;
         List<GrpcChannel> tm_channels = new List<GrpcChannel>();
+        bool[] tm_bitmap;
 
         public TmContact(List<string> tm_urls)
         {
@@ -23,6 +24,14 @@ namespace DADTKV_LM.Contact
                     Console.WriteLine("ERROR: Invalid Tm server url");
                 }
             }
+            tm_bitmap = new bool[tm_channels.Count];
+            for (int i = 0; i < tm_bitmap.Length; i++) tm_bitmap[i] = true;
+        }
+        private int AliveTMs()
+        {
+            int count = 0;
+            foreach (bool b in tm_bitmap) if (b) count++;
+            return count;
         }
         public bool BroadLease(int epoch, List<Request> leases)
         {
@@ -30,6 +39,7 @@ namespace DADTKV_LM.Contact
             LeaseBroadCastRequest request = new LeaseBroadCastRequest { Epoch = epoch };
 
             int acks = 0;
+            int responses = 0;
             Console.WriteLine(leases.Count);
             Console.WriteLine("sent");
 
@@ -50,26 +60,52 @@ namespace DADTKV_LM.Contact
                     tm_stubs.Add(new LeaseService.LeaseServiceClient(channel));
                 }
             }
-            foreach (LeaseService.LeaseServiceClient stub in tm_stubs)
+            if (AliveTMs() <= Majority()) return false;
+
+            for (int i = 0; i < tm_stubs.Count; i++)
             {
-                Console.WriteLine(request.Leases.Count);
-                replies.Add(stub.LeaseBroadCastAsync(request));
-                Console.WriteLine("DONE");
-            }
-            foreach (Grpc.Core.AsyncUnaryCall<LeaseReply> reply in replies)
-            {
-                try
+                if (tm_bitmap[i])
                 {
-                    if (reply.ResponseAsync.Result.Ack) acks++;
+                    Console.WriteLine(request.Leases.Count);
+                    replies[i] = tm_stubs[i].LeaseBroadCastAsync(request);
+                    Console.WriteLine("DONE");
                 }
-                catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded)
+                else replies[i] = null;
+            }
+            while (responses < tm_stubs.Count && acks <= Majority())
+            {
+                for (int i = 0; i < replies.Count; i++)
                 {
-                    Console.WriteLine("Could not contact TM");
+                    if (replies[i] != null)
+                    {
+                        if (replies[i].ResponseAsync.IsCompleted)
+                        {
+                            if (replies[i].ResponseAsync.IsFaulted)
+                            {
+                                tm_bitmap[i] = false;
+                            }
+                            else if (replies[i].ResponseAsync.Result.Ack == true)
+                            {
+                                acks++;
+                            }
+                            responses++;
+                            if (acks > Majority()) break;
+                        }
+                    }
+                    else
+                    {
+                        responses++;
+                        if (acks > Majority()) break;
+                    }
                 }
             }
             Console.Write("RESULTADO PAXOS CHEGOU AOS TMs? ");
             Console.WriteLine(acks);   
-            return acks > (tm_stubs.Count / 2); //aqui é todos ou maioria?
+            return acks > Majority();
+        }
+        private int Majority()
+        {
+            return (int)Math.Floor((decimal)((tm_stubs.Count) / 2));
         }
     }
 }
