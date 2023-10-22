@@ -90,7 +90,8 @@ namespace DADTKV_LM.Impls
             }
 
             bool result = _lmcontact.BroadAccepted(request);
-
+            _data.Possible_Leader = _lmcontact.CheckPossibleLeader(_data.Possible_Leader);
+            
             lock (this)
             {
                 int epoch = request.Epoch;
@@ -151,7 +152,7 @@ namespace DADTKV_LM.Impls
             return Task.FromResult(LeaderAck(request));
         }
         /// <summary>
-         /// Request to a LeaderAck msg
+         /// Reply to a LeaderAck msg
          /// Returns ack with true if we are the leader
          /// </summary>
         public AcceptReply LeaderAck(AckRequest request)
