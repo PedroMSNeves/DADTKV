@@ -31,7 +31,7 @@ namespace DADTKV_TM.Contact
             bitmap = new bool[lm_channels.Count];
             for (int i = 0; i < bitmap.Length; i++) bitmap[i] = true;
         }
-        public bool RequestLease(List<string> keys, int leaseId, Store st)
+        public bool RequestLease(List<string> keys, int leaseId)
         {
             List<Grpc.Core.AsyncUnaryCall<LeaseReply>> replies = new List<Grpc.Core.AsyncUnaryCall<LeaseReply>>();
             LeaseRequest request = new LeaseRequest { Id = _name, LeaseId = leaseId }; //cria request
@@ -58,7 +58,6 @@ namespace DADTKV_TM.Contact
             }
             while (responses < lm_stubs.Count && acks <= Majority())
             {
-                //Monitor.Wait(st, rd.Next(100, 150));
                 for (int i = 0; i < replies.Count; i++)
                 {
                     if (replies[i] != null)
@@ -92,7 +91,19 @@ namespace DADTKV_TM.Contact
             // Confirmation(_name, leaseId, acks > Majority());
             Console.Write("LEASE REQUEST CHEGOU AOS LMs? ");
             Console.WriteLine(acks);
-            return acks > Majority();
+            return ConfirmRequest(acks > Majority(), leaseId);
+        }
+        private bool ConfirmRequest (bool ack, int leaseId)
+        {
+            ConfirmLeaseRequest request = new ConfirmLeaseRequest { Id = _name, LeaseId = leaseId, Ack = ack }; //cria request
+            for (int i = 0; i < lm_stubs.Count; i++)
+            {
+                if (bitmap[i])
+                {
+                    lm_stubs[i].ConfirmLeaseAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10)));
+                }
+            }
+            return true;
         }
         private int Majority()
         {            

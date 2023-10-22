@@ -42,20 +42,18 @@ namespace DADTKV_TM.Structs
         public int insert(Request req, bool lease, Store st)
         {
             int tnumber;
-
-                while (buzy == MAX) Monitor.Wait(st);
-                tnumber = transaction_number++;
-                req.initialize(tnumber);
-                if (!lease)
-                {
-                    // Use of distinct because we only need one copy of each key
-                    _lmContact.RequestLease(req.Keys.Distinct().ToList(), tnumber, st);
-                    req.Lease_number = tnumber;
-                }
-                buffer.Add(req);
-                buzy++;
-                Monitor.PulseAll(st);
-         
+            while (buzy == MAX) Monitor.Wait(st);
+            tnumber = transaction_number++;
+            req.initialize(tnumber);
+            if (!lease)
+            {
+                // Use of distinct because we only need one copy of each key
+                if (!_lmContact.RequestLease(req.Keys.Distinct().ToList(), tnumber)) return -1;
+                req.Lease_number = tnumber;
+            }
+            buffer.Add(req);
+            buzy++;
+            Monitor.PulseAll(st);
             return tnumber;
         }
         public void remove(int i, Store st)
