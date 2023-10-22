@@ -103,8 +103,9 @@ namespace DADTKV_LM.Impls
             {
                 Console.WriteLine("New Paxos Instance");
                 Thread t = new Thread(() => RunPaxosInstance(_data.Epoch));
-                t.Start();
+                t.Start();           
                 Thread.Sleep(timeSlotDuration);
+                //t.Join();
                 _data.Epoch++;
                 _data.RoundID++;
             }
@@ -112,9 +113,10 @@ namespace DADTKV_LM.Impls
         public void RunPaxosInstance(int epoch)
         {
             int round_id;
-            lock (this)
-            {
-                SetMyValue(epoch, _data.GetMyValue());
+
+            SetMyValue(epoch, _data.GetMyValue());
+
+            while (true) {
 
                 while (GetMyValue(epoch).Count == 0) //nao ter este while e mandar o paxos vazio?
                 {
@@ -128,7 +130,6 @@ namespace DADTKV_LM.Impls
                     _data.RoundID = GetOtherTS(epoch) + 1;//evitamos fazer muitas vezes inuteis
                 }
                 round_id = _data.RoundID;
-            }
 
                 Console.WriteLine("PREPARE DONE");
                 if (AcceptRequest(epoch, round_id))
@@ -138,14 +139,25 @@ namespace DADTKV_LM.Impls
 
                     if (other_TS[epoch] > _data.GetWriteTS(epoch))
                     {
-                        _tmContact.BroadLease(epoch, other_value[epoch]); //ver se correu bem, se não correu bem não aumenta a epoch?
+                        if (_tmContact.BroadLease(epoch, other_value[epoch])) 
+                        {
+                            Console.WriteLine("BROADCASTED");
+                            _data.SetWriteTS(epoch, round_id);
+                            break;  
+                        }
                     }
-                    else _tmContact.BroadLease(epoch, my_value[epoch]);
-                    Console.WriteLine("BROADCASTED");
-                    _data.SetWriteTS(epoch, round_id);
-
+                    else
+                    {
+                        if (_tmContact.BroadLease(epoch, my_value[epoch]))
+                        {
+                            Console.WriteLine("BROADCASTED");
+                            _data.SetWriteTS(epoch, round_id);
+                            break;
+                        }
+                    }
                 }
-            _data.RoundID++;
+            }
+            //_data.RoundID++;
         }
         public bool PrepareRequest(int epoch)
         {
