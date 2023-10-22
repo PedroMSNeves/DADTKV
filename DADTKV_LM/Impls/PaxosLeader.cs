@@ -34,7 +34,7 @@ namespace DADTKV_LM.Impls
         public List<Request> GetMyValue(int epoch){ return my_value[epoch]; }
         public void SetMyValue(int epoch, List<Request> req)
         {
-            lock (this) {
+            //lock (this) {
                 if (my_value.ContainsKey(epoch))
                 {
                     my_value[epoch].Clear();
@@ -44,7 +44,7 @@ namespace DADTKV_LM.Impls
                 {
                     my_value.Add(epoch, req);
                 }
-            }
+           // }
         }
         public List<Request> GetOtherValue(int epoch) 
         {
@@ -121,6 +121,7 @@ namespace DADTKV_LM.Impls
                 Console.WriteLine("New Paxos Instance");
                 int epoch = _data.Epoch;
                 _data.Epoch++;
+                Console.WriteLine("epoch: "+ epoch);
                 Thread t = new Thread(() => RunPaxosInstance(epoch));
                 t.Start();               
                 Thread.Sleep(timeSlotDuration);
@@ -132,17 +133,19 @@ namespace DADTKV_LM.Impls
         {
             int round_id;
 
-            SetMyValue(epoch, _data.GetMyValue());
-
-            while (true) {
-
+            lock (my_value)
+            {
+                SetMyValue(epoch, _data.GetMyValue());
                 while (GetMyValue(epoch).Count == 0) //nao ter este while e mandar o paxos vazio?
                 {
                     Thread.Sleep(1000);
                     SetMyValue(epoch, _data.GetMyValue());
                     Console.WriteLine("QUERO MAIS PEDIDOS");
                 }
+            }
 
+            while (true) {
+                
                 while (!PrepareRequest(epoch))
                 {
                     _data.RoundID = GetOtherTS(epoch) + 1;//evitamos fazer muitas vezes inuteis
