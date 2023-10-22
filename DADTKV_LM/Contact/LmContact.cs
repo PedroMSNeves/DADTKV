@@ -104,13 +104,16 @@ namespace DADTKV_LM.Contact
 
             if (AliveLMs() <= Majority()) return false;
 
-            for (int i = 0; i < lm_stubs.Count; i++)
-            {
-                Thread t = new Thread(() => { sendAccepted(ref values, i, request); });
-                t.Start();
-            }
+            
             lock (this)
             {
+                for (int i = 0; i < lm_bitmap.Length; i++)
+                {
+                    Console.WriteLine("Como assim: " + i);
+                    int j = i;
+                    Thread t = new Thread(() => { sendAccepted(ref values, j, request); });
+                    t.Start();
+                }
                 while (!(values[0] + 1 >= (NumLMs() + 1) / 2 || values[1] >= (NumLMs() + 1) / 2)) Monitor.Wait(this);
                 if (values[0] + 1 >= (NumLMs() + 1) / 2) return true;
                 else return false;
@@ -122,7 +125,8 @@ namespace DADTKV_LM.Contact
             try
             {
                 Console.WriteLine("tamanho: " + lm_bitmap.Length);
-                Console.WriteLine("value: " + lm_bitmap[i]);
+                Console.WriteLine("index: " + i);
+
                 if (lm_bitmap[i]) //erro de index mas pq
                 {
                     AcceptReply reply = lm_stubs[i].AcceptedAsync(request).GetAwaiter().GetResult();
@@ -159,9 +163,9 @@ namespace DADTKV_LM.Contact
             {
                 if (lm_bitmap[i])
                 {
-                    replies[i] = lm_stubs[i].AcceptAsync(request);
+                    replies.Add(lm_stubs[i].AcceptAsync(request));
                 }
-                else replies[i] = null;
+                else replies.Add(null);
             }
             while (responses < lm_stubs.Count && acks <= Majority())
             {
@@ -180,13 +184,16 @@ namespace DADTKV_LM.Contact
                                 acks++;
                             }
                             responses++;
+                            replies.Remove(replies[i]);
+                            i--;
                             if (acks > Majority()) break;
                         }
                     }
                     else
                     {
                         responses++;
-                        if (acks > Majority()) break;
+                        replies.Remove(replies[i]);
+                        i--;
                     }
                 }
             }

@@ -67,10 +67,10 @@ namespace DADTKV_LM.Contact
                 if (tm_bitmap[i])
                 {
                     Console.WriteLine(request.Leases.Count);
-                    replies[i] = tm_stubs[i].LeaseBroadCastAsync(request);
+                    replies.Add(tm_stubs[i].LeaseBroadCastAsync(request));
                     Console.WriteLine("DONE");
                 }
-                else replies[i] = null;
+                else replies.Add(null);
             }
             while (responses < tm_stubs.Count && acks <= Majority())
             {
@@ -89,13 +89,16 @@ namespace DADTKV_LM.Contact
                                 acks++;
                             }
                             responses++;
+                            replies.Remove(replies[i]);
+                            i--;
                             if (acks > Majority()) break;
                         }
                     }
                     else
                     {
                         responses++;
-                        if (acks > Majority()) break;
+                        replies.Remove(replies[i]);
+                        i--;
                     }
                 }
             }
