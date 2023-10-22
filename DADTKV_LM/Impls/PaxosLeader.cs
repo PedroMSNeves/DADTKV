@@ -34,35 +34,52 @@ namespace DADTKV_LM.Impls
         public List<Request> GetMyValue(int epoch){ return my_value[epoch]; }
         public void SetMyValue(int epoch, List<Request> req)
         {
-            if (my_value.ContainsKey(epoch))
-            {
-                my_value[epoch].Clear();
-                my_value[epoch].AddRange(req);
-            }
-            else
-            {
-                my_value.Add(epoch, req);
+            lock (this) {
+                if (my_value.ContainsKey(epoch))
+                {
+                    my_value[epoch].Clear();
+                    my_value[epoch].AddRange(req);
+                }
+                else
+                {
+                    my_value.Add(epoch, req);
+                }
             }
         }
-        public List<Request> GetOtherValue(int epoch) { return other_value[epoch]; }
+        public List<Request> GetOtherValue(int epoch) 
+        {
+            List<Request> res;
+            lock (this)
+            {
+                res = new List<Request>();
+                foreach (Request req in other_value[epoch]) { res.Add(req); }
+            }
+            return res; 
+        }
         public void SetOtherValue(int epoch, List<Request> req)
         {
-            if (other_value.ContainsKey(epoch))
+            lock (this)
             {
-                other_value[epoch].Clear();
-                other_value[epoch].AddRange(req);
-            }
-            else
-            {
-                other_value.Add(epoch, req);
+                if (other_value.ContainsKey(epoch))
+                {
+                    other_value[epoch].Clear();
+                    other_value[epoch].AddRange(req);
+                }
+                else
+                {
+                    other_value.Add(epoch, req);
+                }
             }
         }
         public int GetOtherTS(int epoch)
         {
-            if (other_TS.ContainsKey(epoch)) return other_TS[epoch];
-            else return 0;
+            lock (this)
+            {
+                if (other_TS.ContainsKey(epoch)) return other_TS[epoch];
+                else return 0;
+            }
         }
-        public void SetOtherTS(int epoch, int val) { other_TS[epoch] = val; }
+        public void SetOtherTS(int epoch, int val) { lock (this) { other_TS[epoch] = val; } }
         public int Id { get; set; }
 
         /// <summary>
@@ -76,8 +93,8 @@ namespace DADTKV_LM.Impls
 
             while (true) //wait until you are the leader
             {
-                Console.WriteLine("Possible Leader: " + possible_leader);
-                Console.WriteLine("Id: " + Id);
+                //Console.WriteLine("Possible Leader: " + possible_leader);
+                //Console.WriteLine("Id: " + Id);
                 while (Id == possible_leader + 1 && ack) //if we are the next leader
                 {
                     Thread.Sleep(5000); //dorme 5 sec e depois manda mensagem
@@ -105,7 +122,7 @@ namespace DADTKV_LM.Impls
                 int epoch = _data.Epoch;
                 _data.Epoch++;
                 Thread t = new Thread(() => RunPaxosInstance(epoch));
-                t.Start();           
+                t.Start();               
                 Thread.Sleep(timeSlotDuration);
                 //t.Join();
                 _data.RoundID++;
