@@ -102,11 +102,12 @@ namespace DADTKV_LM.Impls
             for (int i = 0; i < numTimeSlots; i++)
             {
                 Console.WriteLine("New Paxos Instance");
-                Thread t = new Thread(() => RunPaxosInstance(_data.Epoch));
+                int epoch = _data.Epoch;
+                _data.Epoch++;
+                Thread t = new Thread(() => RunPaxosInstance(epoch));
                 t.Start();           
                 Thread.Sleep(timeSlotDuration);
                 //t.Join();
-                _data.Epoch++;
                 _data.RoundID++;
             }
         }
