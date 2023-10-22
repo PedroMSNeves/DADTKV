@@ -72,26 +72,32 @@ namespace DADTKV_LM.Impls
         {
             _data.Epoch = 1;
             bool ack = true;
-            int possible_leader = -1;
+            int possible_leader = 0;
 
             while (true) //wait until you are the leader
             {
                 Console.WriteLine("Possible Leader: " + possible_leader);
                 Console.WriteLine("Id: " + Id);
-                while (Id != possible_leader + 1 && ack) //if we are the next leader
+                while (Id == possible_leader + 1 && ack) //if we are the next leader
                 {
                     Thread.Sleep(5000); //dorme 5 sec e depois manda mensagem
-                    lock (_data)
-                    {
+                    //lock (_data)
+                    //{
                         possible_leader = _data.Possible_Leader;
                         if (Id == possible_leader + 1) // depois ver tambem se é o seguinte no bitmap que esteja vivo
                         {
                             ack = _lmcontact.getLeaderAck(_data.Possible_Leader); //Contact the leader to see if he is alive
+
+                            if (!ack)
+                            {
+                                possible_leader++;
+                                _data.IsLeader = true;
+                            }
                         }
-                    }
+                   // }
                 }
+                possible_leader = _data.Possible_Leader;
                 if (_data.IsLeader) break;
-                else Thread.Sleep(100000);
             }
             for (int i = 0; i < numTimeSlots; i++)
             {
@@ -153,8 +159,9 @@ namespace DADTKV_LM.Impls
            //{
                 Promise reply;
                 int promises = 1;
-                int numLMs = _lmcontact.NumOfStubs();
+                int numLMs = _lmcontact.NumLMs();
                 Console.WriteLine("num Stubs: "+ numLMs);
+                
                 for (int i = 0; i < numLMs; i++)
                 {
                     reply = _lmcontact.PrepareRequest(request, i);
@@ -171,7 +178,7 @@ namespace DADTKV_LM.Impls
                         SetOtherTS(epoch, reply.WriteTs);
                     }
                 }
-                res = promises > (_lmcontact.lm_stubs.Count + 1) / 2;
+                res = promises > (numLMs + 1) / 2;
             Console.WriteLine("lider consegue prepare: "+res);
            // }
             return res;
