@@ -80,7 +80,7 @@ namespace DADTKV_LM.Impls
         public AcceptReply Accpt(AcceptRequest request)
         {
             AcceptReply reply = new AcceptReply { Epoch = request.Epoch };
-            _data.Epoch = request.Epoch;
+            //_data.Epoch = request.Epoch;
 
             foreach (LeasePaxos s in request.Leases)foreach(string key  in s.Keys) Console.WriteLine(key);
             if (request.WriteTs < _data.GetReadTS(request.Epoch)) // precisa de lock
@@ -133,7 +133,7 @@ namespace DADTKV_LM.Impls
         {
             lock (this)
             {
-                _data.Epoch = request.Epoch;
+                //_data.Epoch = request.Epoch;
                 Console.WriteLine("RECEBI ACCEPTED");
                 AcceptReply reply = new AcceptReply { Epoch = request.Epoch };
                 Console.WriteLine("request writets: " + request.WriteTs);
