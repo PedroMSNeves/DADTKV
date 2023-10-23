@@ -20,7 +20,7 @@ namespace DADTKV_TM.Impls
         }
         public BroadReply BCast(BroadRequest request)
         {
-           // foreach(DadIntTmProto dadIntTmProto in request.Writes.ToList()) Console.WriteLine(dadIntTmProto.ToString());
+            // Sees if it can write the request
             return new BroadReply { Ack = store.TestWrite(request.TmName, request.LeaseId, request.Epoch) };
         }
         public override Task<BroadReply> ConfirmBroadChanges(ConfirmBroadChangesRequest request, ServerCallContext context)
@@ -30,6 +30,7 @@ namespace DADTKV_TM.Impls
         public BroadReply Conf(ConfirmBroadChangesRequest request)
         {
             Console.WriteLine("REceived new Write Confirmation");
+            // Writes the request if given green light
             if (request.Ack)
             {
                 store.Write(request.Writes.ToList());
@@ -44,9 +45,11 @@ namespace DADTKV_TM.Impls
         {
             ResidualReply reply = new ResidualReply();
             Console.WriteLine("REceived new residualDeletion");
+
+            // Sees if it can remove the requested leases
             lock (waitListresidual)
             {
-                if (waitListresidual.ContainsKey(request.ResidualLeases[0].Tm)) waitListresidual[request.ResidualLeases[0].Tm].Clear();
+                //if (waitListresidual.ContainsKey(request.ResidualLeases[0].Tm)) waitListresidual[request.ResidualLeases[0].Tm].Clear();
                 waitListresidual[request.ResidualLeases[0].Tm] = request.ResidualLeases.ToList();
                 bool[] acks = store.DeleteResidual(request.ResidualLeases.ToList(), request.Epoch);
                 reply.Acks.AddRange(acks);
@@ -61,7 +64,8 @@ namespace DADTKV_TM.Impls
         public BroadReply Conf(ConfirmResidualDeletionRequest request)
         {
             Console.WriteLine("REceived new residualDeletion Confirmation");
-            lock(waitListresidual)
+            // Removes requested leases 
+            lock (waitListresidual)
             {
                 for (int i = 0; i < request.Bools.Count; i++)
                 {

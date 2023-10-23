@@ -9,18 +9,29 @@ namespace DADTKV_TM.Impls
     public class LService : LeaseService.LeaseServiceBase
     {
         private int _lm_count;
-        private Store store;
+        private Store _store;
         public List<WaitLeases> waitLeases;
         public LService(Store st, int lm_count)
         {
             _lm_count = lm_count;
-            store = st;
+            _store = st;
             waitLeases = new List<WaitLeases>();
         }
+        /// <summary>
+        /// Message from LM to give us the results of a epoch
+        /// </summary>
+        /// <param name="request"></param>
+        /// <param name="context"></param>
+        /// <returns></returns>
         public override Task<LeaseReply> LeaseBroadCast(LeaseBroadCastRequest request, ServerCallContext context)
         {
             return Task.FromResult(LBCast(request));
         }
+        /// <summary>
+        /// Sees if already has majority to add has final epoch lease batch
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns></returns>
         public LeaseReply LBCast(LeaseBroadCastRequest request)
         {
             List<FullLease> leases = new List<FullLease>();
@@ -29,6 +40,10 @@ namespace DADTKV_TM.Impls
             lock (waitLeases)
             {
                 Console.WriteLine("EPOCH: " + request.Epoch);
+
+                // To ignore other responses of the epoch after we already had majority
+                if (_store.GetEpoch() > request.Epoch) return new LeaseReply { Ack = true };
+
                 foreach (LeaseProto lp in request.Leases)
                 {
                     Console.WriteLine("LM: " + lp.ToString());
@@ -48,19 +63,18 @@ namespace DADTKV_TM.Impls
                         remove.Add(wl);
                     }
                 }
-                //adicionar se nao existir
+                // Adds if it doesnt exist
                 if (!exists)
                 {
-                    if (_lm_count == 1) store.WaitLeases(leases, request.Epoch);
+                    if (_lm_count == 1) _store.WaitLeases(leases, request.Epoch);
                     else waitLeases.Add(new WaitLeases(request.Epoch, leases));
                 }
                 Console.WriteLine(exists + " " +  ready);
-                //Console.ReadKey();
+                // Passes to the store if already has majority
                 if (ready)
                 {
-                    Console.WriteLine("ADD NEW LEASES");
                     foreach (WaitLeases wl in remove) waitLeases.Remove(wl);
-                    store.WaitLeases(leases, request.Epoch);
+                    _store.WaitLeases(leases, request.Epoch);
                 }
 
             }

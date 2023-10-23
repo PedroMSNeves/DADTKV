@@ -28,6 +28,7 @@ namespace DADTKV_TM
             _waitList = new Dictionary<int, List<FullLease>>();
         }
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        public int GetEpoch() { return _epoch; }
         /// <summary>
         /// Raises epoch by one
         /// </summary>
