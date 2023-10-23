@@ -91,52 +91,9 @@ namespace DADTKV_TM.Contact
             // Confirmation(_name, leaseId, acks > Majority());
             Console.Write("LEASE REQUEST CHEGOU AOS LMs? ");
             Console.WriteLine(acks);
-            return ConfirmRequest(acks == alive, leaseId);
-        }
-        private bool ConfirmRequest (bool ack, int leaseId)
-        {
-            List<Grpc.Core.AsyncUnaryCall<LeaseReply>> replies = new List<Grpc.Core.AsyncUnaryCall<LeaseReply>>();
-            ConfirmLeaseRequest request = new ConfirmLeaseRequest { Id = _name, LeaseId = leaseId, Ack = ack }; //cria request
-            int responses = 0;
-            int alive = LmAlive();
-            int acks = 0;
-            for (int i = 0; i < lm_stubs.Count; i++)
-            {
-                if (bitmap[i])
-                {
-                    replies.Add(lm_stubs[i].ConfirmLeaseAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
-                }
-                else
-                {
-                    replies.Add(null);
-                    responses++;
-                }
-            }
-            while (responses < lm_stubs.Count)
-            {
-                for (int i = 0; i < replies.Count; i++)
-                {
-                    if (replies[i] != null)
-                    {
-                        if (replies[i].ResponseAsync.IsCompleted)
-                        {
-                            if (replies[i].ResponseAsync.IsFaulted)
-                            {
-                                bitmap[i] = false;
-                            }
-                            else if (replies[i].ResponseAsync.Result.Ack == true)
-                            {
-                                acks++;
-                            }
-                            responses++;
-                            replies[i] = null;
-                        }
-                    }
-                }
-            }
-            // Only accepts request if its sure that his lease is requested
             return acks == alive;
         }
+
         private int Majority()
         {            
             return (int) Math.Floor((decimal)((lm_stubs.Count)/2)); // perguntar se é dos vivos ou do total
