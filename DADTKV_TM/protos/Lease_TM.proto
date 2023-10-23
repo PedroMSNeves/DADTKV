@@ -11,11 +11,6 @@ message LeaseRequest {
 	repeated string keys = 2;
 	int32 leaseId = 3;
 }
-message ConfirmLeaseRequest {
-	string id = 1;
-	int32 leaseId = 2;
-	bool ack = 3;
-}
 
 message LeaseReply {
 	bool ack = 1;
@@ -28,5 +23,4 @@ message LeaseBroadCastRequest {
 service LeaseService {
 	rpc Lease (LeaseRequest) returns (LeaseReply);
 	rpc LeaseBroadCast (LeaseBroadCastRequest) returns (LeaseReply);
-	rpc ConfirmLease (ConfirmLeaseRequest) returns (LeaseReply);
 }
