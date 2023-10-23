@@ -31,7 +31,7 @@ namespace DADTKV_TM
         /// <summary>
         /// Raises epoch by one
         /// </summary>
-        public void incrementEpoch() { _epoch++; }
+        public void IncrementEpoch() { _epoch++; }
 
         /// <summary>
         /// Find any lease that intersects with a particular lease (before the particular lease)
@@ -53,7 +53,7 @@ namespace DADTKV_TM
         /// <param name="leaseId"></param>
         /// <param name="tmName"></param>
         /// <returns></returns>
-        public FullLease getFullLease(int leaseId, string tmName)
+        public FullLease GetFullLease(int leaseId, string tmName)
         {
             FullLease fl = null;
             foreach (FullLease fulllease in _fullLeases)
@@ -70,7 +70,7 @@ namespace DADTKV_TM
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        private FullLease getFirst(string key)
+        private FullLease GetFirst(string key)
         {
             foreach (FullLease fl in _fullLeases)
             {
@@ -85,7 +85,7 @@ namespace DADTKV_TM
         /// <param name="reads"></param>
         /// <param name="writes"></param>
         /// <returns></returns>
-        public int verifyAndInsertRequest(List<string> reads, List<DadIntProto> writes)
+        public int VerifyAndInsertRequest(List<string> reads, List<DadIntProto> writes)
         {
             int tnum;
             Request req;
@@ -101,7 +101,7 @@ namespace DADTKV_TM
 
                 // Inserts the request into the queue, if no lease could be used, asks for a new one
                 Console.WriteLine("Insert");
-                tnum = _reqList.insert(req,lease,this);
+                tnum = _reqList.Insert(req,lease,this);
                 Console.WriteLine("Insert END");
 
             }
@@ -113,9 +113,9 @@ namespace DADTKV_TM
         /// </summary>
         /// <param name="tnum"></param>
         /// <returns></returns>
-        public ResultOfTransaction getResult(int tnum)
+        public ResultOfTransaction GetResult(int tnum)
         {
-            return _reqList.getResult(tnum);
+            return _reqList.GetResult(tnum);
         }
         /// <summary>
         /// Used to see if a existing lease is compatible with us and can be used by us
@@ -242,7 +242,7 @@ namespace DADTKV_TM
         public bool CompleteLease(Request req, out FullLease fl)
         {
             // Finds the Lease needed
-            fl = getFullLease(req.Lease_number, _name);
+            fl = GetFullLease(req.Lease_number, _name);
             if (fl == null) return false; 
             // Tries to find intersections, if any is found, then is not our time to execute yet
             return FullLeaseIntersection(fl);
@@ -281,9 +281,9 @@ namespace DADTKV_TM
                     // Tries to propagate
                     int err = Request(req.Reads, req.Writes, fl, ref reply);
                     // Moves it to the pickup waiting place
-                    _reqList.move(req.Transaction_number, reply, err);
+                    _reqList.Move(req.Transaction_number, reply, err);
                     // Remove from the request list
-                    _reqList.remove(0,this);
+                    _reqList.Remove(0,this);
                 }
             }
         }
@@ -333,7 +333,7 @@ namespace DADTKV_TM
                     {
                         foreach (string key in fullLease.Keys)
                         {
-                            FullLease fl = getFirst(key);
+                            FullLease fl = GetFirst(key);
                             if (fl == null) return false;
                             if (leaseId != fl.Lease_number || fl.Tm_name != name) return false;
                         }
@@ -386,7 +386,7 @@ namespace DADTKV_TM
             // Verify all entries
             foreach (string key in lease.Keys)
             {
-                FullLease fl = getFirst(key);
+                FullLease fl = GetFirst(key);
                 // If the lease on top of the queue is not ours or the queue is empty returns false
                 if (fl == null) return false;
                 if (fl.Tm_name != lease.Tm || fl.Lease_number != lease.LeaseId) return false;
@@ -471,7 +471,7 @@ namespace DADTKV_TM
                 }
                 _fullLeases.Add(fl);
             }
-            incrementEpoch();
+            IncrementEpoch();
             // Awakes possible waiting propagation thread
             Monitor.PulseAll(this);
             foreach (FullLease lease in _fullLeases) foreach (string key in lease.Keys) Console.WriteLine(key + ":" + lease.End);

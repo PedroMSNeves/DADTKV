@@ -30,7 +30,7 @@ namespace DADTKV_TM.Structs
             if (buffer.Count == 0) return null;
             return buffer[0];
         }
-        public int insert(Request req, bool lease, Store st)
+        public int Insert(Request req, bool lease, Store st)
         {
             int tnumber;
             while (buzy == MAX) Monitor.Wait(st);
@@ -47,7 +47,7 @@ namespace DADTKV_TM.Structs
             Monitor.PulseAll(st);
             return tnumber;
         }
-        public void remove(int i, Store st)
+        public void Remove(int i, Store st)
         {
 
                 buffer.RemoveAt(i);
@@ -56,7 +56,7 @@ namespace DADTKV_TM.Structs
                 Monitor.PulseAll(st);
             
         }
-        public void move(int transaction_number, List<DadIntProto> resultT, int err)
+        public void Move(int transaction_number, List<DadIntProto> resultT, int err)
         {
             lock (this)
             {
@@ -64,7 +64,7 @@ namespace DADTKV_TM.Structs
                 Monitor.PulseAll(this);
             }
         }
-        public ResultOfTransaction getResult(int t_number)
+        public ResultOfTransaction GetResult(int t_number)
         {
             ResultOfTransaction resultT;
             lock (this)

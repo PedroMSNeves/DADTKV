@@ -24,9 +24,9 @@ namespace DADTKV_TM.Impls
             ResultOfTransaction reply;
             List<string> reads = request.Reads.ToList();
             List<DadIntProto> writes = request.Writes.ToList();
-            int tnum = _store.verifyAndInsertRequest(reads, writes);
+            int tnum = _store.VerifyAndInsertRequest(reads, writes);
             if (tnum == -1) { throw new RpcException(new Status(StatusCode.DeadlineExceeded, "Could not get hold of Lm's")); }
-            reply = _store.getResult(tnum);
+            reply = _store.GetResult(tnum);
             if (reply.Error_code == -2) { throw new RpcException(new Status(StatusCode.DeadlineExceeded, "Could not broadcast the writes")); }
 
             TxReply tx = new TxReply();

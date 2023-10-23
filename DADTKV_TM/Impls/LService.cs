@@ -42,7 +42,7 @@ namespace DADTKV_TM.Impls
                         if (Equal(wl.Leases,leases))
                         {
                             exists = true;
-                            wl.increaseAcks();
+                            wl.IncreaseAcks();
                             if (wl.Acks > Majority()) ready = true;
                         }
                         remove.Add(wl);
