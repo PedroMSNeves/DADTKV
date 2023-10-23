@@ -139,7 +139,7 @@ namespace DADTKV_TM.Contact
                             }
                             else if (replies[i].ResponseAsync.IsCompletedSuccessfully)
                             {
-                                for (int j = 0; j < acks.Length; j++) if (replies[i].ResponseAsync.Result.Acks[i]) acks[j]++;
+                                for (int j = 0; j < acks.Length; j++) if (replies[i].ResponseAsync.Result.Acks[j]) acks[j]++;
                             }
                             responses++;
                             replies.Remove(replies[i]);
