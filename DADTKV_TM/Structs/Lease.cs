@@ -3,13 +3,20 @@
     /// <summary>
     /// Class lease for storing all information about a certain lease
     /// </summary>
-    public class FullLease : Lease
+    public class FullLease
     {
-        public FullLease(string tm_name, int epoch,List<string> keys, int lease_number) : base (tm_name, epoch, lease_number)
+        public FullLease(string tm_name, int epoch,List<string> keys, int lease_number)
         {
             Keys = keys;
+            Tm_name = tm_name;
+            Epoch = epoch;
+            End = false;
+            Lease_number = lease_number;
         }
-
+        public string Tm_name { get; }
+        public int Epoch { get; }
+        public bool End { set; get; }
+        public int Lease_number { get; }
         public List<string> Keys { get; }
 
         public bool Intersection(FullLease other)
@@ -52,28 +59,6 @@
 
             return true;
         }
-        public override string ToString() => $"({Tm_name}, {Epoch}, {End})";
-    }
-
-
-    /// <summary>
-    /// Class lease for storing information about a certain lease
-    /// </summary>
-
-    public class Lease
-    {
-        public Lease(string tm_name, int epoch, int lease_number)
-        {
-            Tm_name = tm_name;
-            Epoch = epoch;
-            End = false;
-            Lease_number = lease_number;
-        }
-        public string Tm_name { get; }
-        public int Epoch { get; }
-        public bool End { set; get; }
-        public int Lease_number { get; }
-
         public override string ToString() => $"({Tm_name}, {Epoch}, {End})";
     }
 }
