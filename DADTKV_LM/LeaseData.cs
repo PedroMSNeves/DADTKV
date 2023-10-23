@@ -82,7 +82,7 @@ namespace DADTKV_LM
                         tm_names.Add(request.Tm_name);
                     }
                 }
-                foreach (String tm in tm_names)
+                foreach (String tm in tm_names.OrderBy(name => name).ToList())
                 {
                     foreach (Request request in _requests)
                     {
