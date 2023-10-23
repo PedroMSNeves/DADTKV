@@ -27,8 +27,38 @@ namespace DADTKV_TM
             _fullLeases = new List<FullLease>();
             _waitList = new Dictionary<int, List<FullLease>>();
         }
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Raises epoch by one
+        /// </summary>
         public void incrementEpoch() { _epoch++; }
 
+        /// <summary>
+        /// Find any lease that intersects with a particular lease (before the particular lease)
+        /// </summary>
+        /// <param name="fl"></param>
+        /// <returns></returns>
+        public bool FullLeaseIntersection(FullLease fl)
+        {
+            foreach (FullLease req in _fullLeases)
+            {
+                if (fl.Lease_number == req.Lease_number && fl.Tm_name == req.Tm_name) return true;
+                else if (fl.Intersection(req)) return false;
+            }
+            return true;
+        }
+        public FullLease getFullLease(int leaseId, string tmName)
+        {
+            FullLease fl = null;
+            foreach (FullLease fulllease in _fullLeases)
+            {
+                if (fulllease.Lease_number == leaseId && fulllease.Tm_name == tmName)
+                {
+                    fl = fulllease;
+                }
+            }
+            return fl;
+        }
         //////////////////////////////////////////////USED BY SERVERSERVICE////////////////////////////////////////////////////////////
         /// <summary>
         /// Used by the ServerService class (add new client transactions)
@@ -157,8 +187,6 @@ namespace DADTKV_TM
             }
             return leaseNr;
         }
-
-        //////////////////////////////////////////////USED BY MAINTHREAD////////////////////////////////////////////////////////////
         /// <summary>
         /// Verifies if a request can use an existing/requested lease
         /// </summary>
@@ -169,19 +197,15 @@ namespace DADTKV_TM
             // We go look for the requests not fullfield
             List<Request> reqs = _reqList.GetRequestsNow();
             // We try to find a existing lease compatible with us
-            Console.WriteLine("CompatibleLease");
             int lease_number = CompatibleLease(req, reqs);
-            Console.WriteLine("CompatibleLease END");
-            if (lease_number != -1) 
+            if (lease_number != -1)
             {
                 req.Lease_number = lease_number;
                 return true;
             }
             // We try to find a requested lease compatible with us
-            Console.WriteLine("CompatibleLeaseNotArrived");
             lease_number = CompatibleLeaseNotArrived(req, reqs);
-            Console.WriteLine("CompatibleLeaseNotArrived END");
-            if (lease_number != -1) 
+            if (lease_number != -1)
             {
                 req.Lease_number = lease_number;
                 return true;
@@ -189,159 +213,96 @@ namespace DADTKV_TM
             // If no lease can be used, we return false, signaling to create a new lease for this request
             return false;
         }
-
-        public bool fullLeaseIntersection(FullLease fl)
-        {
-            foreach (FullLease req in _fullLeases)
-            {
-                if (fl.Lease_number == req.Lease_number && fl.Tm_name == req.Tm_name) return true;
-                else if (fl.Intersection(req)) return false;
-            }
-            return true;
-        }
-
+        //////////////////////////////////////////////USED BY MAINTHREAD (EXECUTE)////////////////////////////////////////////////////////////
         /// <summary>
         /// Used to see if our lease is at the top of the queue at all the lease's keys
         /// </summary>
         /// <param name="req"></param>
         /// <param name="fl"></param>
         /// <returns></returns>
-        public bool completeLease(Request req, out FullLease fl)
+        public bool CompleteLease(Request req, out FullLease fl)
         {
-            fl = null;
-            // If no lease on the queue of one of the keys from the request, or its not for our TM, then the lease is not complete
-            foreach (FullLease fulllease in _fullLeases)
-            {
-                if (fulllease.Lease_number == req.Lease_number && fulllease.Tm_name == _name)
-                {
-                    fl = fulllease;
-                }
-            }
-            if (fl == null) return false;
-                        
-             
-            return fullLeaseIntersection(fl);
+            // Finds the Lease needed
+            fl = getFullLease(req.Lease_number, _name);
+            if (fl == null) return false; 
+            // Tries to find intersections, if any is found, then is not our time to execute yet
+            return FullLeaseIntersection(fl);
         }
         /// <summary>
-        /// Tries to execute the requests
+        /// Tries to execute the requests (sequentially)
         /// </summary>
         public void Execute()
         {
-            //Console.WriteLine("Execute");
-            //Console.WriteLine("GetRequests");
-            
-
             lock (this)
             {
-                // Gets requests (waits until there is at least one)
-                List<Request> reqs; 
+                Request req; 
                 while (true)
                 {
-                    reqs = _reqList.GetRequestsNow();
-                    if (reqs.Count == 0) return;
+                    // Gets first request
+                    req = _reqList.GetRequestNow();
+                    // Aborts if no requests exist
+                    if (req == null) return;
 
                     FullLease fl;
                     List<DadIntProto> reply = new List<DadIntProto>();
                     // Sees if it has the needed complete lease
-                    if (!completeLease(reqs[0], out fl))
+                    if (!CompleteLease(req, out fl))
                     {
-                        // Sequencial requests
-                        Console.WriteLine("NO LEASE: WE need " + _name + " "+reqs[0].Lease_number);
+                        Console.WriteLine("NO LEASE: WE need " + _name + " "+req.Lease_number);
                         foreach (FullLease ff in _fullLeases.ToList())
                         {
                             Console.Write("FL: " + ff.Tm_name + " " + ff.Lease_number + " " + ff.End + " KEYS: ");
                             foreach (string s in ff.Keys) Console.Write(s + " ");
                             Console.WriteLine();
                         }
-                        break;
+                        // Sequencial requests
+                        return;
                     }
 
                     // Tries to propagate
-                    Console.WriteLine("Request");
-
-                    int err = Request(reqs[0].Reads, reqs[0].Writes, fl, ref reply);
-                    Console.WriteLine("Request END");
-
+                    int err = Request(req.Reads, req.Writes, fl, ref reply);
                     // Moves it to the pickup waiting place
-                    Console.WriteLine("Move");
-
-                    _reqList.move(reqs[0].Transaction_number, reply, err);
-                    Console.WriteLine("Move END");
-
+                    _reqList.move(req.Transaction_number, reply, err);
                     // Remove from the request list
-                    Console.WriteLine("Remove");
-
                     _reqList.remove(0,this);
-                    Console.WriteLine("Remove END");
                 }
             }
-            Console.WriteLine("Execute END");
-
         }
         /// <summary>
-        /// Used to propagate writes and close leases on other TM's
+        /// Used to propagate writes to other TM's and prepare reply to the client
         /// </summary>
         /// <param name="reads"></param>
         /// <param name="writes"></param>
         /// <param name="fl"></param>
-        /// <param name="epoch"></param>
         /// <param name="reply"></param>
-        /// <param name="close"></param>
         /// <returns></returns>
         public int Request(List<string> reads, List<DadIntProto> writes, FullLease fl, ref List<DadIntProto> reply)
         {
-            // If we have writes we use them to identify the lease to close (if needed)
+            // If we have writes we try to propagate them
             if(writes.Count != 0)
             {
-                // If lease is to close, we send the name, if not we send "_"
-                Console.WriteLine("BroadCastChanges");
                 bool ack = _tmContact.BroadCastChanges(_name, fl.Lease_number, fl.Epoch, this);
                 _tmContact.ConfirmBroadChanges(writes, ack);
                 if(!ack) return -2;
-
-                Console.WriteLine("BroadCastChanges END");
-
             }
-            Console.WriteLine("Reads");
-
+            // Prepare the reply to the client (and execute writes)
             foreach (string key in reads)
             { 
                 if(!_store.ContainsKey(key)) reply.Add(new DadIntProto { Key = key, Value = 0, InvalidRead = true }); // Does the reads
                 else reply.Add(new DadIntProto { Key = key, Value = _store[key], InvalidRead = false }); // Does the reads
 
             }
-            Console.WriteLine("Reads END");
-            Console.WriteLine("Writes");
             foreach (DadIntProto write in writes) _store[write.Key] = write.Value; // Does the writes
-            Console.WriteLine("Writes END");
-
             return 0;
         }
-        /// <summary>
-        /// Remove the Lease that is on top of the queue for the first key
-        /// </summary>
-        /// <param name="firstkey"></param>
-        /// <param name="tm_name"></param>
-        /// <returns></returns>
-        public bool LeaseRemove(FullLease lease)
-        {
-            //if (_leases[firstkey].TryPeek(out var lease)) fl = (FullLease)lease; // Gets FullLease
-            //else return false; // Theoretically never possible
-            // Verify all entries
-            /*foreach (string key in lease.Keys)
-            {
-                if (_leases[key].TryPeek(out var result))
-                {
-                    if (result.Tm_name != _name && result.Lease_number != lease.Lease_number) return false; 
-                }
-                else return false;
-            }*/
-
-            // Remove all entries
-            _fullLeases.Remove(lease); // Removes lease list entry
-            return true;
-        }
         //////////////////////////////////////////////USED BY BROADSERVICE////////////////////////////////////////////////////////////
+        /// <summary>
+        /// Tests if we have the needed lease at the top of every key queue
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="leaseId"></param>
+        /// <param name="epoch"></param>
+        /// <returns></returns>
         public bool TestWrite (string name, int leaseId, int epoch)
         {
             lock (this)
@@ -356,8 +317,6 @@ namespace DADTKV_TM
                             FullLease fl = getFirst(key);
                             if (fl == null) return false;
                             if (leaseId != fl.Lease_number || fl.Tm_name != name) return false;
-                            // Verify if we have all parts of the lease at the top
-                           
                         }
                         return true;
                     }
@@ -528,6 +487,7 @@ namespace DADTKV_TM
             Console.WriteLine("NewLeases END");
             //Console.ReadKey();
         }
+        //////////////////////////////////////////////USED BY MAINTHREAD (REMOVERESIDUAL)////////////////////////////////////////////////////////////
         public void removeResidual()
         {
             lock (this)
@@ -577,6 +537,17 @@ namespace DADTKV_TM
                 }
             }
             Console.WriteLine("RemoveResidual END");
+        }
+        /// <summary>
+        /// Removes the lease from the arguments
+        /// </summary>
+        /// <param name="lease"></param>
+        /// <returns></returns>
+        public bool LeaseRemove(FullLease lease)
+        {
+            // Removes lease list entry
+            _fullLeases.Remove(lease);
+            return true;
         }
     }
 }

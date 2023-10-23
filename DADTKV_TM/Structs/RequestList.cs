@@ -21,21 +21,14 @@ namespace DADTKV_TM.Structs
             MAX = size;
             _lmContact = new LmContact(name, lm_urls);
         }
-        public List<Request> GetRequests(Store st) 
-        {
-            List<Request> buff;
-
-            while (buzy == 0) Monitor.Wait(st);
-            buff = buffer;
-
-            return buff; 
-        }
         public List<Request> GetRequestsNow()
         {
-            List<Request> buff;
-            buff = buffer;
-
-            return buff;
+            return buffer;
+        }
+        public Request GetRequestNow()
+        {
+            if (buffer.Count == 0) return null;
+            return buffer[0];
         }
         public int insert(Request req, bool lease, Store st)
         {
