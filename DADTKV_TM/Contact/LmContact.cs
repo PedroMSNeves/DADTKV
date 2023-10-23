@@ -39,6 +39,7 @@ namespace DADTKV_TM.Contact
             Console.WriteLine("REQUEST LEASE: " + request.ToString());
             int acks = 0;
             int responses = 0;
+            // Initializes lm_stubs
             if (lm_stubs == null)
             {
                 lm_stubs = new List<LeaseService.LeaseServiceClient>();
@@ -47,16 +48,24 @@ namespace DADTKV_TM.Contact
                     lm_stubs.Add(new LeaseService.LeaseServiceClient(channel));
                 }
             }
+            // If true, we will never be able to reach consensus
             if(LmAlive() <= Majority()) { return false; }
+            // Sends request to all the Alive Lm's
             for (int i = 0; i < lm_stubs.Count; i++)
             {
                 if (bitmap[i])
                 {
                     replies.Add(lm_stubs[i].LeaseAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
                 }
-                else replies.Add(null);
+                else 
+                { 
+                    replies.Add(null);
+                    responses++;
+                }
             }
-            while (responses < lm_stubs.Count && acks <= Majority())
+            // Has to contact all the Alive Lm's
+            int alive = LmAlive();
+            while (responses < lm_stubs.Count)
             {
                 for (int i = 0; i < replies.Count; i++)
                 {
@@ -73,25 +82,16 @@ namespace DADTKV_TM.Contact
                                 acks++;
                             }
                             responses++;
-                            replies.Remove(replies[i]);
-                            i--;
-                            if (acks > Majority()) break;
+                            replies[i] = null;
                         }
                     } 
-                    else
-                    {
-                        responses++;
-                        replies.Remove(replies[i]);
-                        i--;
-                        if (acks > Majority()) break;
-                    }
                 }
             }
 
             // Confirmation(_name, leaseId, acks > Majority());
             Console.Write("LEASE REQUEST CHEGOU AOS LMs? ");
             Console.WriteLine(acks);
-            return ConfirmRequest(acks > Majority(), leaseId);
+            return ConfirmRequest(acks == alive, leaseId);
         }
         private bool ConfirmRequest (bool ack, int leaseId)
         {
