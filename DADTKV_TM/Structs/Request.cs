@@ -17,7 +17,7 @@
         public int Lease_number { set;  get; }
         public List<string> Keys { get; }
 
-        public void initialize (int transaction_number)
+        public void Initialize (int transaction_number)
         {
             Transaction_number = transaction_number;
         }
