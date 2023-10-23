@@ -47,6 +47,12 @@ namespace DADTKV_TM
             }
             return true;
         }
+        /// <summary>
+        /// Gets the lease needed if it exists
+        /// </summary>
+        /// <param name="leaseId"></param>
+        /// <param name="tmName"></param>
+        /// <returns></returns>
         public FullLease getFullLease(int leaseId, string tmName)
         {
             FullLease fl = null;
@@ -58,6 +64,19 @@ namespace DADTKV_TM
                 }
             }
             return fl;
+        }
+        /// <summary>
+        /// Gets the first lease with a specific key if possible
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        private FullLease getFirst(string key)
+        {
+            foreach (FullLease fl in _fullLeases)
+            {
+                if (fl.Contains(key)) return fl;
+            }
+            return null;
         }
         //////////////////////////////////////////////USED BY SERVERSERVICE////////////////////////////////////////////////////////////
         /// <summary>
@@ -324,32 +343,23 @@ namespace DADTKV_TM
             }
             return false;
         }
-
         /// <summary>
-        /// Used by BroadService
-        /// Writes the incoming changes and removes a lease if needed        
+        /// Writes the incoming changes
         /// </summary>
         /// <param name="writes"></param>
-        /// <param name="tm_name"></param>
-        /// <param name="epoch"></param>
         /// <returns></returns>
         public bool Write(List<DadIntTmProto> writes)
         {
-            Console.WriteLine("Write");
-
             lock (this)
             {
                 foreach (DadIntTmProto write in writes) { _store[write.Key] = write.Value; }
             }
-            Console.WriteLine("Write END");
-
             return true;
         }
         /// <summary>
-        /// Deletes all residual leases
+        /// Sees if can delete all received residual leases
         /// </summary>
-        /// <param name="firstKeys"></param>
-        /// <param name="name"></param>
+        /// <param name="residualLeases"></param>
         /// <param name="epoch"></param>
         /// <returns></returns>
         public bool[] DeleteResidual(List<LeaseProtoTm> residualLeases, int epoch)
@@ -360,48 +370,40 @@ namespace DADTKV_TM
                 while (_epoch < epoch) Monitor.Wait(this);
                 for (int i = 0; i < residualLeases.Count; i++)
                 {
-                    Console.WriteLine("LeaseRemove");
-                    if (LeaseTest(residualLeases[i], epoch)) residual[i] = true;
+                    if (LeaseTest(residualLeases[i])) residual[i] = true;
                     else residual[i] = false;
-                    Console.WriteLine("LeaseRemove END");
                 }
             }
-            
-
             return residual;
         }
-        private FullLease getFirst(string key)
-        {
-            foreach (FullLease fl in _fullLeases)
-            {
-                if(fl.Contains(key)) return fl;
-            }
-            return null;
-        }
         /// <summary>
-        /// Remove the Lease that is on top of the queue for the first key (waits if this tm did not receive this epoch's leases)
+        /// Tests if it can remove a specific lease
         /// </summary>
-        /// <param name="firstkey"></param>
-        /// <param name="tm_name"></param>
-        /// <param name="epoch"></param>
+        /// <param name="lease"></param>
         /// <returns></returns>
-        public bool LeaseTest(LeaseProtoTm lease, int epoch)
+        public bool LeaseTest(LeaseProtoTm lease)
         {
             // Verify all entries
             foreach (string key in lease.Keys)
             {
                 FullLease fl = getFirst(key);
+                // If the lease on top of the queue is not ours or the queue is empty returns false
                 if (fl == null) return false;
-                if (fl.Tm_name != lease.Tm || fl.Lease_number != lease.LeaseId) return false; // Theoretically never possible
+                if (fl.Tm_name != lease.Tm || fl.Lease_number != lease.LeaseId) return false;
             }
-            // guardar e depois da confirmacao e que apagamos
             return true;
         }
+        /// <summary>
+        /// Remove the received Lease (waits if this tm did not receive this epoch's leases)
+        /// </summary>
+        /// <param name="lease"></param>
+        /// <param name="epoch"></param>
         public void LeaseRemove(LeaseProtoTm lease, int epoch)
         {
             FullLease fl = null;
             lock (this)
             {
+                while (_epoch < epoch) Monitor.Wait(this);
                 foreach (FullLease fullLease in _fullLeases)
                 {
                     if (fullLease.Lease_number == lease.LeaseId && fullLease.Tm_name == lease.Tm)
@@ -411,11 +413,10 @@ namespace DADTKV_TM
                     }
                 }
                 if (fl == null) return;
-                // Remove all entries
-                _fullLeases.Remove(fl); // Removes lease list entry
+                // Removes lease list entry
+                _fullLeases.Remove(fl);
             }
         }
-
         //////////////////////////////////////////////USED BY LSERVICE////////////////////////////////////////////////////////////
         /// <summary>
         /// Used to store batches of leases that cannot yet be added (mensage delay or multipaxos)
@@ -427,9 +428,6 @@ namespace DADTKV_TM
         {
             lock (this)
             {
-                //foreach (FullLease lease in _fullLeases) foreach (string key in lease.Keys) Console.WriteLine(key + ":" + lease.End);
-                //foreach (FullLease lease in leases) foreach (string key in lease.Keys) Console.WriteLine(key + ":" + lease.End);
-
                 // If it's not the epoch we want, we have to wait for it
                 if (epoch != _epoch + 1)
                 {
@@ -454,10 +452,7 @@ namespace DADTKV_TM
                 foreach (int i in remove) _waitList.Remove(i);
             }
         }
-         
-
         /// <summary>
-        /// Used By LService
         /// Receives new leases for the epoch
         /// </summary>
         /// <param name="leases"></param>
@@ -465,12 +460,9 @@ namespace DADTKV_TM
         public void NewLeases(List<FullLease> leases, int epoch)
         {
             Console.WriteLine("NewLeases");
-
-            //foreach (FullLease lease in _fullLeases) foreach (string key in lease.Keys) Console.WriteLine(key + ":" + lease.End);
-            //foreach (FullLease lease in leases) foreach (string key in lease.Keys) Console.WriteLine(key + ":" + lease.End);
             foreach (FullLease fl in leases)
             {
-                foreach(string  key in fl.Keys)
+                foreach(string key in fl.Keys)
                 {
                     foreach (FullLease fulllease in _fullLeases)
                     {
@@ -483,12 +475,13 @@ namespace DADTKV_TM
             // Awakes possible waiting propagation thread
             Monitor.PulseAll(this);
             foreach (FullLease lease in _fullLeases) foreach (string key in lease.Keys) Console.WriteLine(key + ":" + lease.End);
-
             Console.WriteLine("NewLeases END");
-            //Console.ReadKey();
         }
         //////////////////////////////////////////////USED BY MAINTHREAD (REMOVERESIDUAL)////////////////////////////////////////////////////////////
-        public void removeResidual()
+        /// <summary>
+        /// Sees and tries to remove any residual leases
+        /// </summary>
+        public void RemoveResidual()
         {
             lock (this)
             {

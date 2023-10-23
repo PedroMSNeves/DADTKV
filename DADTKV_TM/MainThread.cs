@@ -13,7 +13,7 @@
             while (true)
             {
                 _store.Execute();
-                _store.removeResidual();
+                _store.RemoveResidual();
                 Thread.Sleep(rd.Next(100,500));
             }
         }
