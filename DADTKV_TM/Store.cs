@@ -155,6 +155,9 @@ namespace DADTKV_TM
                             {
                                 // If we find an intersection, we cant use this lease
                                 if (fl.Intersection(req)) return -1;
+                                Console.WriteLine("REQUEST LEASE USE: " + fl.Lease_number + " " + req.Lease_number);
+                                foreach (string key in rq.Keys) Console.Write(key + " ");
+                                Console.WriteLine(" ");
                             }
                         }
                         return fl.Lease_number;
@@ -486,8 +489,14 @@ namespace DADTKV_TM
         {
             lock (this)
             {
+                Console.WriteLine("REMOVE RESIDUAL");
                 bool used = false;
                 int maxEpoch = 0;
+                Console.WriteLine("Requests");
+                foreach (Request rq in _reqList.GetRequestsNow())
+                {
+                    Console.WriteLine(rq.Transaction_number +" "  + rq.Lease_number );
+                }
                 List<FullLease> leases = new List<FullLease>();
                 foreach (FullLease fullLease in _fullLeases.ToList())
                 {
@@ -510,6 +519,7 @@ namespace DADTKV_TM
                     }
                     used = false;
                 }
+                Console.WriteLine("REMOVE RESIDUAL1");
                 if (leases.Count == 0) return;
                 Console.WriteLine("APAGAR LEASES RESIDUAIS: ");
                 //foreach (string key in leases) Console.WriteLine(key + " ");

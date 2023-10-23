@@ -33,12 +33,9 @@ namespace DADTKV_TM.Contact
         {
             List<Grpc.Core.AsyncUnaryCall<BroadReply>> replies = new List<Grpc.Core.AsyncUnaryCall<BroadReply>>();
             BroadRequest request = new BroadRequest { TmName = name, LeaseId = leaseId, Epoch = epoch };
-            //List<DadIntTmProto> writesTm = new List<DadIntTmProto>();
             int acks = 1;
             int responses = 0;
-            //foreach (DadIntProto tm in writes) writesTm.Add(new DadIntTmProto { Key = tm.Key, Value = tm.Value });
-            //request.Writes.AddRange(writesTm);
-
+            // Initialize TM's stubs
             if (tm_stubs == null)
             {
                 tm_stubs = new List<BroadCastService.BroadCastServiceClient>();
@@ -47,17 +44,22 @@ namespace DADTKV_TM.Contact
                     tm_stubs.Add(new BroadCastService.BroadCastServiceClient(channel));
                 }
             }
-            if (LmAlive() <= Majority()) { return false; }
+            // Sends request to all the Alive Tm's
             for (int i = 0; i < tm_stubs.Count; i++)
             {
                 if (bitmap[i])
                 {
                     replies.Add(tm_stubs[i].BroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
                 }
-                else replies.Add(null);
+                else
+                { 
+                    replies.Add(null); 
+                    responses++;
+                }
             }
             Random rd = new Random();
-            while (responses < tm_stubs.Count && acks <= Majority())
+            int alive = TmAlive();
+            while (responses < tm_stubs.Count)
             {
                 Monitor.Wait(st, rd.Next(100, 150));
                 for (int i = 0; i < replies.Count; i++)
@@ -72,24 +74,15 @@ namespace DADTKV_TM.Contact
                             }
                             else if (replies[i].ResponseAsync.Result.Ack == true) acks++;
                             responses++;
-                            replies.Remove(replies[i]);
-                            i--;
-                            if (acks > Majority()) break;
+                            replies[i] = null;
                         }
                     }
-                    else
-                    {
-                        responses++;
-                        replies.Remove(replies[i]);
-                        i--;
-                    }
-                   
                 }
             }
             Console.Write("RESULTADO PROPAGATE CHEGOU AOS TMs? ");
             Console.WriteLine(acks);
 
-            return acks > Majority();
+            return acks == alive;
         }
         public bool[] DeleteResidualKeys(List<FullLease> residualLeases, int epoch, Store st) 
         {
@@ -98,14 +91,14 @@ namespace DADTKV_TM.Contact
             int responses = 0;
             int[] acks = new int[residualLeases.Count];
             for (int i = 0; i < acks.Length; i++) acks[i] = 0;
-
+            // Prepare the request
             foreach (FullLease lease in residualLeases) 
             {
                 LeaseProtoTm leaseProtoTm = new LeaseProtoTm { LeaseId = lease.Lease_number, Tm = lease.Tm_name };
                 leaseProtoTm.Keys.AddRange(lease.Keys);
                 residualDeletionRequest.ResidualLeases.Add(leaseProtoTm);
             }
-            // we have to order the leaseProtoTm list by the lease number
+            // Initialize TM's stubs
             if (tm_stubs == null)
             {
                 tm_stubs = new List<BroadCastService.BroadCastServiceClient>();
@@ -114,16 +107,21 @@ namespace DADTKV_TM.Contact
                     tm_stubs.Add(new BroadCastService.BroadCastServiceClient(channel));
                 }
             }
-            if (LmAlive() <= Majority()) { return null; }
+            // Sends request to all the Alive Tm's
             for (int i = 0; i < tm_stubs.Count; i++)
             {
                 if (bitmap[i])
                 {
                     replies.Add(tm_stubs[i].ResidualDeletionAsync(residualDeletionRequest, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
                 }
-                else replies.Add(null);
+                else
+                {
+                    replies.Add(null);
+                    responses++;
+                }
             }
             Random rd = new Random();
+            int alive = TmAlive();
             while (responses < tm_stubs.Count)
             {
                 Monitor.Wait(st, rd.Next(100, 150));
@@ -142,16 +140,8 @@ namespace DADTKV_TM.Contact
                                 for (int j = 0; j < acks.Length; j++) if (replies[i].ResponseAsync.Result.Acks[j]) acks[j]++;
                             }
                             responses++;
-                            replies.Remove(replies[i]);
-                            i--;
-                            if (responses == tm_stubs.Count) break;
+                            replies[i] = null;
                         }
-                    }
-                    else 
-                    {
-                        responses++;
-                        replies.Remove(replies[i]);
-                        i--;
                     }
                 }
             }
@@ -159,29 +149,37 @@ namespace DADTKV_TM.Contact
             Console.WriteLine(responses);
             foreach (int i in acks) Console.Write(i + " ");
             bool[] bools = new bool[residualLeases.Count];
+            Console.WriteLine("ACKS");
             for (int i = 0; i < acks.Length; i++)
             {
-                if (acks[i] > Majority()) bools[i] = true;
+                Console.Write(acks[i] + " ");
+                if (acks[i]+1 == alive) bools[i] = true;
                 else bools[i] = false;
+                Console.Write(bools[i] + " ");
             }
-            // for now returns always true
+            Console.WriteLine();
+            Console.WriteLine("ACKS");
+            
             return bools;
         }
         public void ConfirmBroadChanges(List<DadIntProto> writes, bool ack)
         {
+            // Ignores if can't propagate
             if (!ack) return;
+            // Prepares request
             ConfirmBroadChangesRequest confirmRequest = new ConfirmBroadChangesRequest { Ack = ack };
-            // we have to order the leaseProtoTm list by the lease number
             List<DadIntTmProto> writesTm = new List<DadIntTmProto>();
             foreach (DadIntProto tm in writes) writesTm.Add(new DadIntTmProto { Key = tm.Key, Value = tm.Value });
             confirmRequest.Writes.AddRange(writesTm);
 
-            foreach (BroadCastService.BroadCastServiceClient stub in tm_stubs)
+            // Sends request to all the Alive Tm's
+            for (int i = 0; i < tm_stubs.Count; i++)
             {
-                stub.ConfirmBroadChangesAsync(confirmRequest); // tirar isto de syncrono
+                if (bitmap[i])
+                {
+                    tm_stubs[i].ConfirmBroadChangesAsync(confirmRequest); // tirar isto de syncrono
+                }
             }
-
-            // for now returns always true
             return;
         }
         public bool ConfirmResidualDeletion(string name, bool[] acks, int epoch)
@@ -190,19 +188,17 @@ namespace DADTKV_TM.Contact
             confirmRequest.Bools.AddRange(acks);
             // we have to order the leaseProtoTm list by the lease number
 
-            foreach (BroadCastService.BroadCastServiceClient stub in tm_stubs)
+            for (int i = 0; i < tm_stubs.Count; i++)
             {
-                stub.ConfirmResidualDeletionAsync(confirmRequest); // tirar isto de syncrono
+                if (bitmap[i])
+                {
+                    tm_stubs[i].ConfirmResidualDeletionAsync(confirmRequest); // tirar isto de syncrono
+                }
             }
 
-            // for now returns always true
             return true;
         }
-        private int Majority()
-        {
-            return (int)Math.Floor((decimal)((tm_stubs.Count + 1) / 2)); // perguntar se é dos vivos ou do total
-        }
-        private int LmAlive()
+        private int TmAlive()
         {
             int count = 1;
             foreach (bool b in bitmap) if (b) count++;
@@ -210,5 +206,3 @@ namespace DADTKV_TM.Contact
         }
     }
 }
-//depois de receber maioria mandar msg de confirmacao
-//se correr mal mandar nack

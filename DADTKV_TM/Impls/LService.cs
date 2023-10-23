@@ -40,7 +40,6 @@ namespace DADTKV_TM.Impls
             lock (waitLeases)
             {
                 Console.WriteLine("EPOCH: " + request.Epoch);
-
                 // To ignore other responses of the epoch after we already had majority
                 if (_store.GetEpoch() > request.Epoch) return new LeaseReply { Ack = true };
 
