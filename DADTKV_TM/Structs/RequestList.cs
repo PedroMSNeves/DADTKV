@@ -13,7 +13,6 @@ namespace DADTKV_TM.Structs
         private int MAX;
         private int buzy = 0;
         private int transaction_number = 1;
-        private int _epoch = 0; // Last epoch received
         private LmContact _lmContact;
         public RequestList(int size, string name, List<string> lm_urls)
         {
@@ -22,7 +21,6 @@ namespace DADTKV_TM.Structs
             MAX = size;
             _lmContact = new LmContact(name, lm_urls);
         }
-        public int get_epoch() { return _epoch; }
         public List<Request> GetRequests(Store st) 
         {
             List<Request> buff;
@@ -87,6 +85,5 @@ namespace DADTKV_TM.Structs
             }
             return resultT;
         }
-        public void incrementEpoch() { _epoch++; }
     }
 }
