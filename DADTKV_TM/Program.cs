@@ -10,7 +10,7 @@ namespace DADTKV_TM
         // Receives input like "Tm1 myurl othertmurl1 othertmurl2 LM lmurl1 lmurl2" (name,hisurl,otherurl...,LM(delimiter),lmurl...)
         private static void getUrls(string[] args, ref List<string> tm_urls, ref List<string> lm_urls)
         {
-            if (args.Length < 4) // Minimum is name, his own url the LM delimiter and 1 Lm url
+            if (args.Length < 5) // Minimum is name, his own url the LM delimiter and 1 Lm url
             {
                 Console.WriteLine("ERROR: Invalid number of args");
                 Console.WriteLine("Press any key to close");
@@ -18,7 +18,7 @@ namespace DADTKV_TM
                 Environment.Exit(0);
             }
             bool lm = false;
-            for (int i = 2; i < args.Length; i++)
+            for (int i = 3; i < args.Length; i++)
             {
                 //Console.WriteLine(args[i]);
                 if (args[i].Equals("LM")) lm = true;
@@ -63,9 +63,8 @@ namespace DADTKV_TM
                 return;
             }
             ServerPort serverPort = new ServerPort(url.Host, url.Port, ServerCredentials.Insecure);
-
             // Store is shared by the various services
-            Store st = new Store(args[0], tm_urls, lm_urls);
+            Store st = new Store(args[0], int.Parse(args[2]), tm_urls, lm_urls);
             Server server = new Server
             {
                 Services = { TmService.BindService(new ServerService(st, args[0])),

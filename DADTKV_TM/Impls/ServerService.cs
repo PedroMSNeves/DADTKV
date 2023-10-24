@@ -27,6 +27,7 @@ namespace DADTKV_TM.Impls
             if (tnum == -1) { throw new RpcException(new Status(StatusCode.DeadlineExceeded, "Could not get hold of Lm's")); }
             // Gets the result of the request
             reply = _store.GetResult(tnum);
+            if (reply.Error_code == -1) { throw new RpcException(new Status(StatusCode.DeadlineExceeded, "Could not get hold of Lm's")); }
             if (reply.Error_code == -2) { throw new RpcException(new Status(StatusCode.DeadlineExceeded, "Could not broadcast the writes")); }
             // Prepares reply
             TxReply tx = new TxReply();

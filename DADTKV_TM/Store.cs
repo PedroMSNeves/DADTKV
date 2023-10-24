@@ -17,9 +17,12 @@ namespace DADTKV_TM
         private TmContact _tmContact; // Used to propagate things to other TM
         private Dictionary<int, List<FullLease>> _waitList;
         private int _epoch = 0; // Last epoch received
-
-        public Store(string name, List<string> tm_urls, List<string> lm_urls)
+        private int tries;
+        private int _triesBeforeDropingRequest;
+        public Store(string name, int timeSlotDuration, List<string> tm_urls, List<string> lm_urls)
         {
+            tries = timeSlotDuration / 25;
+            ResetTimes();
             _reqList = new RequestList(10,name, lm_urls); // Maximum of requests waiting allowed and information necessary to ask for new leases
             _name = name;
             _store = new Dictionary<string, int>();
@@ -78,6 +81,14 @@ namespace DADTKV_TM
                 if (fl.Contains(key)) return fl;
             }
             return null;
+        }
+        public void DecreaseRelease()
+        {
+            _triesBeforeDropingRequest--;
+        }
+        public void ResetTimes()
+        {
+            _triesBeforeDropingRequest = tries;
         }
         //////////////////////////////////////////////USED BY SERVERSERVICE////////////////////////////////////////////////////////////
         /// <summary>
@@ -251,6 +262,44 @@ namespace DADTKV_TM
             // Tries to find intersections, if any is found, then is not our time to execute yet
             return FullLeaseIntersection(fl);
         }
+        public void Rerequest(Request req)
+        {
+            // If Tm is stuck in a loop the server will drop the lease and possibly request a new one
+            ResetTimes();
+            List<Request> rqs = new List<Request>();
+            List<DadIntProto> reply = new List<DadIntProto>();
+            Console.WriteLine("REREQUEST LEASE " + req.Lease_number);
+            Console.ReadKey();
+            // It will add the request in the 0 position and all the others that use that lease
+            foreach (Request rq in _reqList.GetRequestsNow())
+            {
+                if (rq.Lease_number == req.Lease_number)
+                {
+                    rqs.Add(rq);
+                    Console.WriteLine(rq.Transaction_number+" "+rq.Lease_number);
+                }
+            }
+            // Drops all the requests
+            _reqList.Remove(rqs, this);
+            bool lease;
+            int err;
+            // In the best case cenario will request 0 new leases (if they can use another existing lease)
+            // In the worst cenario (with no crashes) will request 1 lease for the first one, and the rest use that lease
+            foreach (Request rq in rqs)
+            {
+                // Tries to use other existing leases
+                lease = verifyLease(req);
+                // If couldnt use an existing lease, requests a new one (and inserts the requests again)
+                err = _reqList.Insert(req, lease, req.Transaction_number, this);
+                if (err == -1)
+                {
+                    // If couldnt request the lease from the Lm's marks the request has done with error
+                    _reqList.Move(req.Transaction_number, reply, err);
+                }
+            }
+            
+            Console.WriteLine("REREQUEST LEASE END " + req.Lease_number);
+        }
         /// <summary>
         /// Tries to execute the requests (sequentially)
         /// </summary>
@@ -271,6 +320,13 @@ namespace DADTKV_TM
                     // Sees if it has the needed complete lease
                     if (!CompleteLease(req, out fl))
                     {
+                        Console.WriteLine("TRIES BEFORE DROPING" + _triesBeforeDropingRequest);
+                        DecreaseRelease();
+                        if(_triesBeforeDropingRequest == 0)
+                        {
+                            Rerequest(req);
+                            return;
+                        }
                         Console.WriteLine("NO LEASE: WE need " + _name + " "+req.Lease_number);
                         foreach (FullLease ff in _fullLeases.ToList())
                         {
@@ -281,7 +337,7 @@ namespace DADTKV_TM
                         // Sequencial requests
                         return;
                     }
-
+                    ResetTimes();
                     // Tries to propagate
                     int err = Request(req.Reads, req.Writes, fl, ref reply);
                     // Moves it to the pickup waiting place
@@ -330,6 +386,7 @@ namespace DADTKV_TM
         {
             lock (this)
             {
+                ResetTimes();
                 while (_epoch < epoch) Monitor.Wait(this);
                 foreach(FullLease fullLease in _fullLeases)
                 {
@@ -356,6 +413,7 @@ namespace DADTKV_TM
         {
             lock (this)
             {
+                ResetTimes();
                 foreach (DadIntTmProto write in writes) { _store[write.Key] = write.Value; }
             }
             return true;
@@ -371,6 +429,7 @@ namespace DADTKV_TM
             bool[] residual = new bool[residualLeases.Count];
             lock (this)
             {
+                ResetTimes();
                 while (_epoch < epoch) Monitor.Wait(this);
                 for (int i = 0; i < residualLeases.Count; i++)
                 {
@@ -390,6 +449,7 @@ namespace DADTKV_TM
             // Verify all entries
             foreach (string key in lease.Keys)
             {
+                ResetTimes();
                 FullLease fl = GetFirst(key);
                 // If the lease on top of the queue is not ours or the queue is empty returns false
                 if (fl == null) return false;
@@ -407,6 +467,7 @@ namespace DADTKV_TM
             FullLease fl = null;
             lock (this)
             {
+                ResetTimes();
                 while (_epoch < epoch) Monitor.Wait(this);
                 foreach (FullLease fullLease in _fullLeases)
                 {
@@ -432,6 +493,7 @@ namespace DADTKV_TM
         {
             lock (this)
             {
+                ResetTimes();
                 // If it's not the epoch we want, we have to wait for it
                 if (epoch != _epoch + 1)
                 {
@@ -534,6 +596,7 @@ namespace DADTKV_TM
 
                 if (_tmContact.ConfirmResidualDeletion(_name, bools, maxEpoch))
                 {
+                    ResetTimes();
                     for (int i = 0; i < bools.Length; i++)
                     {
                         if (bools[i]) LeaseRemove(leases[i]);

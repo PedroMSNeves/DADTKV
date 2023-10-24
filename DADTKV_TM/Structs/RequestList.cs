@@ -30,6 +30,22 @@ namespace DADTKV_TM.Structs
             if (buffer.Count == 0) return null;
             return buffer[0];
         }
+        public int Insert(Request req, bool lease, int tNum, Store st)
+        {
+            int tnumber;
+            while (buzy == MAX) Monitor.Wait(st);
+            tnumber = tNum;
+            if (!lease)
+            {
+                // Use of distinct because we only need one copy of each key
+                if (!_lmContact.RequestLease(req.Keys.Distinct().ToList(), tnumber)) return -1;
+                req.Lease_number = tnumber;
+            }
+            buffer.Add(req);
+            buzy++;
+            Monitor.PulseAll(st);
+            return tnumber;
+        }
         public int Insert(Request req, bool lease, Store st)
         {
             int tnumber;
@@ -49,11 +65,23 @@ namespace DADTKV_TM.Structs
         }
         public void Remove(int i, Store st)
         {
-
                 buffer.RemoveAt(i);
                 buzy--;
-
                 Monitor.PulseAll(st);
+        }
+        public void Remove(List<Request> reqs, Store st)
+        {
+            foreach (Request request in reqs)
+            {
+                for (int i = 0; i < buffer.Count; i++)
+                {
+                    if (buffer[i].Transaction_number == request.Transaction_number) 
+                    { 
+                        Remove(i,st);
+                        break;
+                    }
+                }
+            }
             
         }
         public void Move(int transaction_number, List<DadIntProto> resultT, int err)
