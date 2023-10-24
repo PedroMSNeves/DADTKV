@@ -4,65 +4,77 @@ using System;
 
 namespace DADTKV_TM
 {
-
     class Program
     {
-        // Receives input like "Tm1 myurl othertmurl1 othertmurl2 LM lmurl1 lmurl2" (name,hisurl,otherurl...,LM(delimiter),lmurl...)
-        private static void getUrls(string[] args, ref List<string> tm_urls, ref List<string> lm_urls)
+        public static void exitOnError(string message)
         {
-            if (args.Length < 4) // Minimum is name, his own url the LM delimiter and 1 Lm url
-            {
-                Console.WriteLine("ERROR: Invalid number of args");
-                Console.WriteLine("Press any key to close");
-                Console.ReadKey();
-                Environment.Exit(0);
-            }
+            Console.WriteLine($"Error: {message}.\nPress any key to close.");
+            Console.ReadKey();
+            Environment.Exit(0);
+        }
+
+        // Expected input: name, my_url, crash_ts, other_url, ..., LM (delimiter), lm_url, ..., SP (delimiter), sp_ts, sp_id, ...
+        public static void Main(string[] args)
+        {
+            List<string> tm_urls = new List<string>();
+            List<string> lm_urls = new List<string>();
+            Dictionary<int, List<string>> suspected_processes = new Dictionary<int, List<string>>(); // <timeslot, process_ids>
+
+            //Console.WriteLine("TM");
+            //foreach (string s in args) Console.Write(s + " ");
+
+            // Minimum is name, his own url, when to crash, the LM delimiter and 1 Lm url
+            if (args.Length < 5) exitOnError("Invalid number of arguments");
+
+            Uri my_url = new Uri(args[1]);;
+            ServerPort serverPort = new ServerPort(my_url.Host, my_url.Port, ServerCredentials.Insecure);
+
+            int crash_ts = Int32.Parse(args[2]);
+
             bool lm = false;
-            for (int i = 2; i < args.Length; i++)
+            bool sp = false;
+            int currentTimeslot = -1;
+            for (int i = 3; i < args.Length; i++)
             {
-                //Console.WriteLine(args[i]);
-                if (args[i].Equals("LM")) lm = true;
-                else if (!lm) tm_urls.Add(args[i]);
-                else lm_urls.Add(args[i]);
+                if (args[i].Equals("LM"))
+                {
+                    lm = true;                   
+                }
+                else if (args[i].Equals("SP"))
+                {
+                    lm = false;
+                    sp = true;
+                }
+                else if (!lm && !sp)
+                {
+                    tm_urls.Add(args[i]);
+                }
+                else if (lm && !sp)
+                {
+                    lm_urls.Add(args[i]);
+                }
+                else if (sp) {
+                    if (args[i].All(char.IsDigit))
+                    {
+                        currentTimeslot = int.Parse(args[i]);
+                        if (!suspected_processes.ContainsKey(currentTimeslot))
+                        {
+                            suspected_processes[currentTimeslot] = new List<string>();
+                        }
+                    }
+                    else if (currentTimeslot != -1)
+                    {
+                        suspected_processes[currentTimeslot].Add(args[i]);
+                    }
+                }
             }
+
             Console.WriteLine("TM");
             foreach (string url in tm_urls) { Console.WriteLine(url); }
             Console.WriteLine("LM");
             foreach (string url in lm_urls) { Console.WriteLine(url); }
 
-            if (!lm)
-            {
-                Console.WriteLine("ERROR: Invalid number of args. No LeaseManagers provided");
-                Console.WriteLine("Press any key to close");
-                Console.ReadKey();
-                Environment.Exit(0);
-            }
-
-        }
-
-
-        public static void Main(string[] args)
-        {
-            List<string> tm_urls = new List<string>();
-            List<string> lm_urls = new List<string>();
-            Uri url;
-
-            //Console.WriteLine("TM");
-            //foreach (string s in args) Console.Write(s + " ");
-
-            getUrls(args, ref tm_urls, ref lm_urls); // gets all url servers minus his
-            try
-            {
-                url = new Uri(args[1]); // gets his url 
-            }
-            catch (System.UriFormatException)
-            {
-                Console.WriteLine("ERROR: Invalid url (self)");
-                Console.WriteLine("Press any key to close");
-                Console.ReadKey();
-                return;
-            }
-            ServerPort serverPort = new ServerPort(url.Host, url.Port, ServerCredentials.Insecure);
+            if (!lm) exitOnError("No LeaseManagers provided");
 
             // Store is shared by the various services
             Store st = new Store(args[0], tm_urls, lm_urls);
@@ -76,7 +88,7 @@ namespace DADTKV_TM
 
             server.Start();
 
-            Console.WriteLine("Insecure server listening on host " + url.Host + " port " + url.Port);
+            Console.WriteLine("Insecure server listening on host " + my_url.Host + " port " + my_url.Port);
             AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
 
             // Creates the cycle for the main thread, the thread that executes the transactions
