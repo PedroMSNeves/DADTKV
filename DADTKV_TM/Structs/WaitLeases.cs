@@ -19,7 +19,7 @@ namespace DADTKV_TM.Structs
         public int Acks { set; get; }
         public List<FullLease> Leases { get; }
 
-        public void increaseAcks()
+        public void IncreaseAcks()
         {
             Acks++;
         }

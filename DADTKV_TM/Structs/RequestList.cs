@@ -13,7 +13,6 @@ namespace DADTKV_TM.Structs
         private int MAX;
         private int buzy = 0;
         private int transaction_number = 1;
-        private int _epoch = 0; // Last epoch received
         private LmContact _lmContact;
         public RequestList(int size, string name, List<string> lm_urls)
         {
@@ -22,51 +21,70 @@ namespace DADTKV_TM.Structs
             MAX = size;
             _lmContact = new LmContact(name, lm_urls);
         }
-        public int get_epoch() { return _epoch; }
-        public List<Request> GetRequests(Store st) 
-        {
-            List<Request> buff;
-
-            while (buzy == 0) Monitor.Wait(st);
-            buff = buffer;
-
-            return buff; 
-        }
         public List<Request> GetRequestsNow()
         {
-            List<Request> buff;
-            buff = buffer;
-
-            return buff;
+            return buffer;
         }
-        public int insert(Request req, bool lease, Store st)
+        public Request GetRequestNow()
+        {
+            if (buffer.Count == 0) return null;
+            return buffer[0];
+        }
+        public int Insert(Request req, bool lease, int tNum, Store st)
         {
             int tnumber;
-
-                while (buzy == MAX) Monitor.Wait(st);
-                tnumber = transaction_number++;
-                req.initialize(tnumber, _epoch);
-                if (!lease)
-                {
-                    _lmContact.RequestLease(req.Keys, tnumber);
-                    req.Lease_number = tnumber;
-                }
-                buffer.Add(req);
-                buzy++;
-                Monitor.PulseAll(st);
-         
+            while (buzy == MAX) Monitor.Wait(st);
+            tnumber = tNum;
+            if (!lease)
+            {
+                // Use of distinct because we only need one copy of each key
+                if (!_lmContact.RequestLease(req.Keys.Distinct().ToList(), tnumber)) return -1;
+                req.Lease_number = tnumber;
+            }
+            buffer.Add(req);
+            buzy++;
+            Monitor.PulseAll(st);
             return tnumber;
         }
-        public void remove(int i, Store st)
+        public int Insert(Request req, bool lease, Store st)
         {
-
+            int tnumber;
+            while (buzy == MAX) Monitor.Wait(st);
+            tnumber = transaction_number++;
+            req.Initialize(tnumber);
+            if (!lease)
+            {
+                // Use of distinct because we only need one copy of each key
+                if (!_lmContact.RequestLease(req.Keys.Distinct().ToList(), tnumber)) return -1;
+                req.Lease_number = tnumber;
+            }
+            buffer.Add(req);
+            buzy++;
+            Monitor.PulseAll(st);
+            return tnumber;
+        }
+        public void Remove(int i, Store st)
+        {
                 buffer.RemoveAt(i);
                 buzy--;
-
                 Monitor.PulseAll(st);
+        }
+        public void Remove(List<Request> reqs, Store st)
+        {
+            foreach (Request request in reqs)
+            {
+                for (int i = 0; i < buffer.Count; i++)
+                {
+                    if (buffer[i].Transaction_number == request.Transaction_number) 
+                    { 
+                        Remove(i,st);
+                        break;
+                    }
+                }
+            }
             
         }
-        public void move(int transaction_number, List<DadIntProto> resultT, int err)
+        public void Move(int transaction_number, List<DadIntProto> resultT, int err)
         {
             lock (this)
             {
@@ -74,7 +92,7 @@ namespace DADTKV_TM.Structs
                 Monitor.PulseAll(this);
             }
         }
-        public ResultOfTransaction getResult(int t_number)
+        public ResultOfTransaction GetResult(int t_number)
         {
             ResultOfTransaction resultT;
             lock (this)
@@ -88,6 +106,5 @@ namespace DADTKV_TM.Structs
             }
             return resultT;
         }
-        public void incrementEpoch() { _epoch++; }
     }
 }

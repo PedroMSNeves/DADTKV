@@ -73,10 +73,21 @@ namespace DADTKV_LM
         {
             lock (this)
             {
+                List<string> tm_names = new List<string>();
                 List<Request> myValue = new List<Request>();
                 foreach (Request request in _requests)
                 {
-                    myValue.Add(request);
+                    if (!tm_names.Contains(request.Tm_name))
+                    {
+                        tm_names.Add(request.Tm_name);
+                    }
+                }
+                foreach (String tm in tm_names.OrderBy(name => name).ToList())
+                {
+                    foreach (Request request in _requests)
+                    {
+                        if (request.Tm_name == tm) myValue.Add(request);
+                    }
                 }
                 _requests.Clear();
                 return myValue;

@@ -80,7 +80,7 @@ namespace DADTKV_LM.Impls
         public AcceptReply Accpt(AcceptRequest request)
         {
             AcceptReply reply = new AcceptReply { Epoch = request.Epoch };
-            _data.Epoch = request.Epoch;
+            //_data.Epoch = request.Epoch;
 
             foreach (LeasePaxos s in request.Leases)foreach(string key  in s.Keys) Console.WriteLine(key);
             if (request.WriteTs < _data.GetReadTS(request.Epoch)) // precisa de lock
@@ -90,7 +90,8 @@ namespace DADTKV_LM.Impls
             }
 
             bool result = _lmcontact.BroadAccepted(request);
-
+            _data.Possible_Leader = _lmcontact.CheckPossibleLeader(_data.Possible_Leader);
+            
             lock (this)
             {
                 int epoch = request.Epoch;
@@ -132,7 +133,7 @@ namespace DADTKV_LM.Impls
         {
             lock (this)
             {
-                _data.Epoch = request.Epoch;
+                //_data.Epoch = request.Epoch;
                 Console.WriteLine("RECEBI ACCEPTED");
                 AcceptReply reply = new AcceptReply { Epoch = request.Epoch };
                 Console.WriteLine("request writets: " + request.WriteTs);
@@ -151,7 +152,7 @@ namespace DADTKV_LM.Impls
             return Task.FromResult(LeaderAck(request));
         }
         /// <summary>
-         /// Request to a LeaderAck msg
+         /// Reply to a LeaderAck msg
          /// Returns ack with true if we are the leader
          /// </summary>
         public AcceptReply LeaderAck(AckRequest request)

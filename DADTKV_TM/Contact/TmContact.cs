@@ -1,4 +1,5 @@
-﻿using Grpc.Core;
+﻿using DADTKV_TM.Structs;
+using Grpc.Core;
 using Grpc.Net.Client;
 
 namespace DADTKV_TM.Contact
@@ -10,6 +11,7 @@ namespace DADTKV_TM.Contact
     {
         List<BroadCastService.BroadCastServiceClient> tm_stubs = null;
         List<GrpcChannel> tm_channels = new List<GrpcChannel>();
+        bool[] bitmap;
 
         public TmContact(List<string> tm_urls)
         {
@@ -24,16 +26,16 @@ namespace DADTKV_TM.Contact
                     Console.WriteLine("ERROR: Invalid Tm server url");
                 }
             }
+            bitmap = new bool[tm_channels.Count];
+            for (int i = 0; i < bitmap.Length; i++) bitmap[i] = true;
         }
-        public bool BroadCastChanges(List<DadIntProto> writes, string name, int epoch, Store st)
+        public bool BroadCastChanges(string name, int leaseId, int epoch, Store st)
         {
             List<Grpc.Core.AsyncUnaryCall<BroadReply>> replies = new List<Grpc.Core.AsyncUnaryCall<BroadReply>>();
-            BroadRequest request = new BroadRequest { TmName = name, Epoch = epoch };
-            List<DadIntTmProto> writesTm = new List<DadIntTmProto>();
-            int acks = 0;
-            foreach (DadIntProto tm in writes) writesTm.Add(new DadIntTmProto { Key = tm.Key, Value = tm.Value });
-            request.Writes.AddRange(writesTm);
-
+            BroadRequest request = new BroadRequest { TmName = name, LeaseId = leaseId, Epoch = epoch };
+            int acks = 1;
+            int responses = 0;
+            // Initialize TM's stubs
             if (tm_stubs == null)
             {
                 tm_stubs = new List<BroadCastService.BroadCastServiceClient>();
@@ -42,37 +44,61 @@ namespace DADTKV_TM.Contact
                     tm_stubs.Add(new BroadCastService.BroadCastServiceClient(channel));
                 }
             }
-
-            foreach (BroadCastService.BroadCastServiceClient stub in tm_stubs)
+            // Sends request to all the Alive Tm's
+            for (int i = 0; i < tm_stubs.Count; i++)
             {
-                replies.Add(stub.BroadCastAsync(request)); // tirar isto de syncrono
+                if (bitmap[i])
+                {
+                    replies.Add(tm_stubs[i].BroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
+                }
+                else
+                { 
+                    replies.Add(null); 
+                    responses++;
+                }
             }
             Random rd = new Random();
-            while (acks < tm_stubs.Count)
+            int alive = TmAlive();
+            while (responses < tm_stubs.Count)
             {
                 Monitor.Wait(st, rd.Next(100, 150));
                 for (int i = 0; i < replies.Count; i++)
                 {
-                    if (replies[i].ResponseAsync.IsCompleted)
+                    if (replies[i] != null)
                     {
-                        if (replies[i].ResponseAsync.Result.Ack == true) acks++;
-                        replies.Remove(replies[i]);
-                        i--;
-                        if (acks == 2) break;
+                        if (replies[i].ResponseAsync.IsCompleted)
+                        {
+                            if (replies[i].ResponseAsync.IsFaulted)
+                            {
+                                bitmap[i] = false;
+                            }
+                            else if (replies[i].ResponseAsync.Result.Ack == true) acks++;
+                            responses++;
+                            replies[i] = null;
+                        }
                     }
                 }
-                if (replies.Count == 0) break; //error
             }
             Console.Write("RESULTADO PROPAGATE CHEGOU AOS TMs? ");
             Console.WriteLine(acks);
-            return true;
+
+            return acks == alive;
         }
-        public bool DeleteResidualKeys(List<string> residualKeys , string name, int epoch, Store st) 
+        public bool[] DeleteResidualKeys(List<FullLease> residualLeases, int epoch, Store st) 
         {
-            List<Grpc.Core.AsyncUnaryCall<BroadReply>> replies = new List<Grpc.Core.AsyncUnaryCall<BroadReply>>();
-            ResidualDeletionRequest residualDeletionRequest = new ResidualDeletionRequest { TmName = name, Epoch = epoch };
-            int acks = 0;
-            residualDeletionRequest.FirstKeys.AddRange(residualKeys);
+            List<Grpc.Core.AsyncUnaryCall<ResidualReply>> replies = new List<Grpc.Core.AsyncUnaryCall<ResidualReply>>();
+            ResidualDeletionRequest residualDeletionRequest = new ResidualDeletionRequest { Epoch = epoch };
+            int responses = 0;
+            int[] acks = new int[residualLeases.Count];
+            for (int i = 0; i < acks.Length; i++) acks[i] = 0;
+            // Prepare the request
+            foreach (FullLease lease in residualLeases) 
+            {
+                LeaseProtoTm leaseProtoTm = new LeaseProtoTm { LeaseId = lease.Lease_number, Tm = lease.Tm_name };
+                leaseProtoTm.Keys.AddRange(lease.Keys);
+                residualDeletionRequest.ResidualLeases.Add(leaseProtoTm);
+            }
+            // Initialize TM's stubs
             if (tm_stubs == null)
             {
                 tm_stubs = new List<BroadCastService.BroadCastServiceClient>();
@@ -81,31 +107,102 @@ namespace DADTKV_TM.Contact
                     tm_stubs.Add(new BroadCastService.BroadCastServiceClient(channel));
                 }
             }
-            foreach (BroadCastService.BroadCastServiceClient stub in tm_stubs)
+            // Sends request to all the Alive Tm's
+            for (int i = 0; i < tm_stubs.Count; i++)
             {
-                replies.Add(stub.ResidualDeletionAsync(residualDeletionRequest)); // tirar isto de syncrono
+                if (bitmap[i])
+                {
+                    replies.Add(tm_stubs[i].ResidualDeletionAsync(residualDeletionRequest, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
+                }
+                else
+                {
+                    replies.Add(null);
+                    responses++;
+                }
             }
             Random rd = new Random();
-            while (acks < tm_stubs.Count)
+            int alive = TmAlive();
+            while (responses < tm_stubs.Count)
             {
                 Monitor.Wait(st, rd.Next(100, 150));
                 for (int i = 0; i < replies.Count; i++)
                 {
-                    if (replies[i].ResponseAsync.IsCompleted)
+                    if (replies[i] != null)
                     {
-                        if (replies[i].ResponseAsync.Result.Ack == true) acks++;
-                        replies.Remove(replies[i]);
-                        i--;
-                        if (acks == 2) break;
+                        if (replies[i].ResponseAsync.IsCompleted)
+                        {
+                            if (replies[i].ResponseAsync.IsFaulted)
+                            {
+                                bitmap[i] = false;
+                            }
+                            else if (replies[i].ResponseAsync.IsCompletedSuccessfully)
+                            {
+                                for (int j = 0; j < acks.Length; j++) if (replies[i].ResponseAsync.Result.Acks[j]) acks[j]++;
+                            }
+                            responses++;
+                            replies[i] = null;
+                        }
                     }
                 }
-                if (replies.Count == 0) break; //error
             }
             Console.Write("RESULTADO Residual Lease CHEGOU AOS TMs? ");
-            Console.WriteLine(acks);
+            Console.WriteLine(responses);
+            foreach (int i in acks) Console.Write(i + " ");
+            bool[] bools = new bool[residualLeases.Count];
+            Console.WriteLine("ACKS");
+            for (int i = 0; i < acks.Length; i++)
+            {
+                Console.Write(acks[i] + " ");
+                if (acks[i]+1 == alive) bools[i] = true;
+                else bools[i] = false;
+                Console.Write(bools[i] + " ");
+            }
+            Console.WriteLine();
+            Console.WriteLine("ACKS");
+            
+            return bools;
+        }
+        public void ConfirmBroadChanges(List<DadIntProto> writes, bool ack)
+        {
+            // Ignores if can't propagate
+            if (!ack) return;
+            // Prepares request
+            ConfirmBroadChangesRequest confirmRequest = new ConfirmBroadChangesRequest { Ack = ack };
+            List<DadIntTmProto> writesTm = new List<DadIntTmProto>();
+            foreach (DadIntProto tm in writes) writesTm.Add(new DadIntTmProto { Key = tm.Key, Value = tm.Value });
+            confirmRequest.Writes.AddRange(writesTm);
 
-            // for now returns always true
+            // Sends request to all the Alive Tm's
+            for (int i = 0; i < tm_stubs.Count; i++)
+            {
+                if (bitmap[i])
+                {
+                    tm_stubs[i].ConfirmBroadChangesAsync(confirmRequest); // tirar isto de syncrono
+                }
+            }
+            return;
+        }
+        public bool ConfirmResidualDeletion(string name, bool[] acks, int epoch)
+        {
+            ConfirmResidualDeletionRequest confirmRequest = new ConfirmResidualDeletionRequest { TmName = name, Epoch = epoch };
+            confirmRequest.Bools.AddRange(acks);
+            // we have to order the leaseProtoTm list by the lease number
+
+            for (int i = 0; i < tm_stubs.Count; i++)
+            {
+                if (bitmap[i])
+                {
+                    tm_stubs[i].ConfirmResidualDeletionAsync(confirmRequest); // tirar isto de syncrono
+                }
+            }
+
             return true;
+        }
+        private int TmAlive()
+        {
+            int count = 1;
+            foreach (bool b in bitmap) if (b) count++;
+            return count;
         }
     }
 }

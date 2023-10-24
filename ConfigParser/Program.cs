@@ -30,7 +30,7 @@ namespace ConfigParser
             client.Start();
         }
 
-        public static void launchTransactionManager(string id, string url, List<string> transactionManagers, List<string> leaseManagers)
+        public static void launchTransactionManager(string id, string url, int timeSlotDuration, List<string> transactionManagers, List<string> leaseManagers)
         {
             string args = "";
             // Pass all Transaction Manager URLs to the Transaction Manager
@@ -48,7 +48,7 @@ namespace ConfigParser
             }
 
             Console.WriteLine($"Launching Transaction Manager {id} with args: {args}");
-            Process server = createProcess("DADTKV_TM", $"{id} {url} {args}");
+            Process server = createProcess("DADTKV_TM", $"{id} {url} {timeSlotDuration} {args}");
             server.Start();
         }
 
@@ -159,7 +159,7 @@ namespace ConfigParser
             // Launch all servers
             foreach (KeyValuePair<string, string> transactionManager in transactionManagers)
             {
-                launchTransactionManager(transactionManager.Key, transactionManager.Value, transactionManagers.Values.ToList(), leaseManagers.Values.ToList());
+                launchTransactionManager(transactionManager.Key, transactionManager.Value, timeSlotDuration, transactionManagers.Values.ToList(), leaseManagers.Values.ToList());
             }
 
 

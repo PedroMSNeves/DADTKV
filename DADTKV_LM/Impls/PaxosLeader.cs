@@ -34,35 +34,52 @@ namespace DADTKV_LM.Impls
         public List<Request> GetMyValue(int epoch){ return my_value[epoch]; }
         public void SetMyValue(int epoch, List<Request> req)
         {
-            if (my_value.ContainsKey(epoch))
-            {
-                my_value[epoch].Clear();
-                my_value[epoch].AddRange(req);
-            }
-            else
-            {
-                my_value.Add(epoch, req);
-            }
+            //lock (this) {
+                if (my_value.ContainsKey(epoch))
+                {
+                    my_value[epoch].Clear();
+                    my_value[epoch].AddRange(req);
+                }
+                else
+                {
+                    my_value.Add(epoch, req);
+                }
+           // }
         }
-        public List<Request> GetOtherValue(int epoch) { return other_value[epoch]; }
+        public List<Request> GetOtherValue(int epoch) 
+        {
+            List<Request> res;
+            lock (this)
+            {
+                res = new List<Request>();
+                foreach (Request req in other_value[epoch]) { res.Add(req); }
+            }
+            return res; 
+        }
         public void SetOtherValue(int epoch, List<Request> req)
         {
-            if (other_value.ContainsKey(epoch))
+            lock (this)
             {
-                other_value[epoch].Clear();
-                other_value[epoch].AddRange(req);
-            }
-            else
-            {
-                other_value.Add(epoch, req);
+                if (other_value.ContainsKey(epoch))
+                {
+                    other_value[epoch].Clear();
+                    other_value[epoch].AddRange(req);
+                }
+                else
+                {
+                    other_value.Add(epoch, req);
+                }
             }
         }
         public int GetOtherTS(int epoch)
         {
-            if (other_TS.ContainsKey(epoch)) return other_TS[epoch];
-            else return 0;
+            lock (this)
+            {
+                if (other_TS.ContainsKey(epoch)) return other_TS[epoch];
+                else return 0;
+            }
         }
-        public void SetOtherTS(int epoch, int val) { other_TS[epoch] = val; }
+        public void SetOtherTS(int epoch, int val) { lock (this) { other_TS[epoch] = val; } }
         public int Id { get; set; }
 
         /// <summary>
@@ -72,17 +89,17 @@ namespace DADTKV_LM.Impls
         {
             _data.Epoch = 1;
             bool ack = true;
-            int possible_leader = -1;
+            int possible_leader = 0;
 
             while (true) //wait until you are the leader
             {
-                Console.WriteLine("Possible Leader: " + possible_leader);
-                Console.WriteLine("Id: " + Id);
-                while (Id != possible_leader + 1 && ack) //if we are the next leader
+                //Console.WriteLine("Possible Leader: " + possible_leader);
+                //Console.WriteLine("Id: " + Id);
+                while (Id == possible_leader + 1 && ack) //if we are the next leader
                 {
                     Thread.Sleep(5000); //dorme 5 sec e depois manda mensagem
-                    lock (_data)
-                    {
+                    //lock (_data)
+                    //{
                         possible_leader = _data.Possible_Leader;
                         if (Id == possible_leader + 1) // depois ver tambem se é o seguinte no bitmap que esteja vivo
                         {
@@ -94,40 +111,46 @@ namespace DADTKV_LM.Impls
                                 _data.IsLeader = true;
                             }
                         }
-                    }
+                   // }
                 }
+                possible_leader = _data.Possible_Leader;
                 if (_data.IsLeader) break;
             }
             for (int i = 0; i < numTimeSlots; i++)
             {
                 Console.WriteLine("New Paxos Instance");
-                Thread t = new Thread(() => RunPaxosInstance(_data.Epoch));
-                t.Start();
-                Thread.Sleep(timeSlotDuration);
+                int epoch = _data.Epoch;
                 _data.Epoch++;
+                Console.WriteLine("epoch: "+ epoch);
+                Thread t = new Thread(() => RunPaxosInstance(epoch));
+                t.Start();               
+                Thread.Sleep(timeSlotDuration);
+                //t.Join();
                 _data.RoundID++;
             }
         }
         public void RunPaxosInstance(int epoch)
         {
             int round_id;
-            lock (this)
+
+            lock (my_value)
             {
                 SetMyValue(epoch, _data.GetMyValue());
-
                 while (GetMyValue(epoch).Count == 0) //nao ter este while e mandar o paxos vazio?
                 {
                     Thread.Sleep(1000);
                     SetMyValue(epoch, _data.GetMyValue());
                     Console.WriteLine("QUERO MAIS PEDIDOS");
                 }
+            }
 
+            while (true) {
+                
                 while (!PrepareRequest(epoch))
                 {
                     _data.RoundID = GetOtherTS(epoch) + 1;//evitamos fazer muitas vezes inuteis
                 }
                 round_id = _data.RoundID;
-            }
 
                 Console.WriteLine("PREPARE DONE");
                 if (AcceptRequest(epoch, round_id))
@@ -137,14 +160,25 @@ namespace DADTKV_LM.Impls
 
                     if (other_TS[epoch] > _data.GetWriteTS(epoch))
                     {
-                        _tmContact.BroadLease(epoch, other_value[epoch]); //ver se correu bem, se não correu bem não aumenta a epoch?
+                        if (_tmContact.BroadLease(epoch, other_value[epoch])) 
+                        {
+                            Console.WriteLine("BROADCASTED");
+                            _data.SetWriteTS(epoch, round_id);
+                            break;  
+                        }
                     }
-                    else _tmContact.BroadLease(epoch, my_value[epoch]);
-                    Console.WriteLine("BROADCASTED");
-                    _data.SetWriteTS(epoch, round_id);
-
+                    else
+                    {
+                        if (_tmContact.BroadLease(epoch, my_value[epoch]))
+                        {
+                            Console.WriteLine("BROADCASTED");
+                            _data.SetWriteTS(epoch, round_id);
+                            break;
+                        }
+                    }
                 }
-            _data.RoundID++;
+            }
+            //_data.RoundID++;
         }
         public bool PrepareRequest(int epoch)
         {
@@ -158,8 +192,9 @@ namespace DADTKV_LM.Impls
            //{
                 Promise reply;
                 int promises = 1;
-                int numLMs = _lmcontact.NumOfStubs();
+                int numLMs = _lmcontact.NumLMs();
                 Console.WriteLine("num Stubs: "+ numLMs);
+                
                 for (int i = 0; i < numLMs; i++)
                 {
                     reply = _lmcontact.PrepareRequest(request, i);
@@ -176,7 +211,7 @@ namespace DADTKV_LM.Impls
                         SetOtherTS(epoch, reply.WriteTs);
                     }
                 }
-                res = promises > (_lmcontact.lm_stubs.Count + 1) / 2;
+                res = promises > (numLMs + 1) / 2;
             Console.WriteLine("lider consegue prepare: "+res);
            // }
             return res;
