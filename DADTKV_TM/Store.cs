@@ -135,47 +135,43 @@ namespace DADTKV_TM
         /// <param name="rq"></param>
         /// <param name="reqs"></param>
         /// <returns></returns>
-        public int CompatibleLease (Request rq, List<Request> reqs)
+        public int CompatibleLease(Request rq, List<Request> reqs)
         {
             // If no lease on the queue of one of the keys from the request, then no lease will work
-
-            foreach (FullLease fl  in _fullLeases)
+            bool found = false;
+            Request lastrq = null;
+            FullLease fulllease = null;
+            foreach (FullLease fl in _fullLeases)
             {
                 // If marked to end, cant add more to it
                 if (fl.End) continue;
                 // We can only use leases that are for our TM
-                if(fl.Tm_name == _name)
+                if (fl.Tm_name != _name) continue;
+                // Sees if we can use the lease
+                if (!rq.SubGroup(fl)) continue;
+                fulllease = fl; // It can only exist one (others are marked to end)
+                break;
+            }
+            if (fulllease == null) return -1;
+
+            // Look for the last person using this lease
+            foreach (Request req in reqs)
+            {
+                if (req.Lease_number == fulllease.Lease_number) lastrq = req;
+            }
+            // If no one will use it, we have to see all the requestList
+            if (lastrq == null) found = true;
+            // Tries to find an intersection between this lease's last request and us
+            foreach (Request req in reqs)
+            {
+                if (lastrq != null && lastrq.Transaction_number == req.Transaction_number) found = true;
+                else if (found)
                 {
-                    // Sees if we can use the lease
-                    if (rq.SubGroup(fl))
-                    {
-                        bool found = false;
-                        Request lastrq = null;
-                        // Look for the last person using this lease
-                        foreach (Request req in reqs)
-                        {
-                            if (req.Lease_number == fl.Lease_number) lastrq = req;
-                        }
-                        // If no one will use it, we have to see all the requestList
-                        if (lastrq == null) found = true;
-                        // Tries to find an intersection between this lease's last request and us
-                        foreach (Request req in reqs)
-                        {
-                            if (lastrq != null && lastrq.Transaction_number == req.Transaction_number) found = true;
-                            else if (found)
-                            {
-                                // If we find an intersection, we cant use this lease
-                                if (fl.Intersection(req)) return -1;
-                                Console.WriteLine("REQUEST LEASE USE: " + fl.Lease_number + " " + req.Lease_number);
-                                foreach (string key in rq.Keys) Console.Write(key + " ");
-                                Console.WriteLine(" ");
-                            }
-                        }
-                        return fl.Lease_number;
-                    }
+                    // If we find an intersection, we cant use this lease
+                    if (fulllease.Intersection(req)) return -1;
                 }
             }
-            return -1;
+            return fulllease.Lease_number;
         }
         /// <summary>
         /// Used to see if a requested lease is compatible with us and can be used by us
@@ -382,27 +378,25 @@ namespace DADTKV_TM
         /// <param name="leaseId"></param>
         /// <param name="epoch"></param>
         /// <returns></returns>
-        public bool TestWrite (string name, int leaseId, int epoch)
+        public bool TestWrite(string name, int leaseId, int epoch)
         {
             lock (this)
             {
                 ResetTimes();
+                // Waits to have the epoch needed
                 while (_epoch < epoch) Monitor.Wait(this);
-                foreach(FullLease fullLease in _fullLeases)
+                // Tries to find the needed lease
+                FullLease fl = GetFullLease(leaseId, name);
+                if (fl == null) return false;
+
+                foreach (string key in fl.Keys)
                 {
-                    if(fullLease.Lease_number == leaseId && fullLease.Tm_name == name)
-                    {
-                        foreach (string key in fullLease.Keys)
-                        {
-                            FullLease fl = GetFirst(key);
-                            if (fl == null) return false;
-                            if (leaseId != fl.Lease_number || fl.Tm_name != name) return false;
-                        }
-                        return true;
-                    }
+                    FullLease ful = GetFirst(key);
+                    if (ful == null) return false;
+                    if (leaseId != ful.Lease_number || ful.Tm_name != name) return false;
                 }
+                return true;
             }
-            return false;
         }
         /// <summary>
         /// Writes the incoming changes
