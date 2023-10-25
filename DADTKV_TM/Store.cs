@@ -19,14 +19,14 @@ namespace DADTKV_TM
         private int _epoch = 0; // Last epoch received
         private int tries;
         private int _triesBeforeDropingRequest;
-        public Store(string name, int timeSlotDuration, List<string> tm_urls, List<string> lm_urls)
+        public Store(string name, int timeSlotDuration, List<string> tm_urls, List<string> lm_urls, List<string> tm_names, List<string> lm_names)
         {
             tries = timeSlotDuration / 25;
             ResetTimes();
-            _reqList = new RequestList(10,name, lm_urls); // Maximum of requests waiting allowed and information necessary to ask for new leases
+            _reqList = new RequestList(10,name, lm_urls, lm_names); // Maximum of requests waiting allowed and information necessary to ask for new leases
             _name = name;
             _store = new Dictionary<string, int>();
-            _tmContact = new TmContact(tm_urls);
+            _tmContact = new TmContact(tm_urls, tm_names);
             _fullLeases = new List<FullLease>();
             _waitList = new Dictionary<int, List<FullLease>>();
         }
@@ -265,7 +265,7 @@ namespace DADTKV_TM
             List<Request> rqs = new List<Request>();
             List<DadIntProto> reply = new List<DadIntProto>();
             Console.WriteLine("REREQUEST LEASE " + req.Lease_number);
-            Console.ReadKey();
+            //Console.ReadKey();
             // It will add the request in the 0 position and all the others that use that lease
             foreach (Request rq in _reqList.GetRequestsNow())
             {

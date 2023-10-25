@@ -14,12 +14,12 @@ namespace DADTKV_TM.Structs
         private int buzy = 0;
         private int transaction_number = 1;
         private LmContact _lmContact;
-        public RequestList(int size, string name, List<string> lm_urls)
+        public RequestList(int size, string name, List<string> lm_urls, List<string> lm_names)
         {
             result = new Dictionary<int, ResultOfTransaction>();
             buffer = new List<Request>() ;
             MAX = size;
-            _lmContact = new LmContact(name, lm_urls);
+            _lmContact = new LmContact(name, lm_urls, lm_names);
         }
         public List<Request> GetRequestsNow()
         {

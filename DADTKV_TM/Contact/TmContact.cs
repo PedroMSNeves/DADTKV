@@ -9,11 +9,12 @@ namespace DADTKV_TM.Contact
     /// </summary>
     public class TmContact
     {
+        List<string> tm_names;
         List<BroadCastService.BroadCastServiceClient> tm_stubs = null;
         List<GrpcChannel> tm_channels = new List<GrpcChannel>();
         bool[] bitmap;
 
-        public TmContact(List<string> tm_urls)
+        public TmContact(List<string> tm_urls, List<string> t_names)
         {
             foreach (string url in tm_urls)
             {
@@ -26,6 +27,7 @@ namespace DADTKV_TM.Contact
                     Console.WriteLine("ERROR: Invalid Tm server url");
                 }
             }
+            tm_names = t_names;
             bitmap = new bool[tm_channels.Count];
             for (int i = 0; i < bitmap.Length; i++) bitmap[i] = true;
         }

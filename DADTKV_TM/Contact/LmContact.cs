@@ -10,11 +10,12 @@ namespace DADTKV_TM.Contact
     public class LmContact
     {
         private string _name;
+        List<string> lm_names;
         List<LeaseService.LeaseServiceClient> lm_stubs = null;
         bool[] bitmap;
         List<GrpcChannel> lm_channels = new List<GrpcChannel>();
 
-        public LmContact(string name, List<string> lm_urls)
+        public LmContact(string name, List<string> lm_urls, List<string> l_names)
         {
             _name = name;
             foreach (string url in lm_urls)
@@ -28,6 +29,7 @@ namespace DADTKV_TM.Contact
                     Console.WriteLine("ERROR: Invalid Lm server url");
                 }
             }
+            lm_names = l_names;
             bitmap = new bool[lm_channels.Count];
             for (int i = 0; i < bitmap.Length; i++) bitmap[i] = true;
         }
