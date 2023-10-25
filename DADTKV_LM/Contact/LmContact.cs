@@ -81,7 +81,7 @@ namespace DADTKV_LM.Contact
                     lm_stubs.Add(new PaxosService.PaxosServiceClient(channel));
                 }
             }
-            if (AliveLMs() <= Majority()) return new Promise { Ack = false };
+            //if (AliveLMs() <= Majority()) return new Promise { Ack = false };
             try
             {
                 Console.WriteLine("i: "+i);
