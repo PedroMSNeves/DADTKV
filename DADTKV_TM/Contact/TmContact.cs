@@ -58,7 +58,6 @@ namespace DADTKV_TM.Contact
                 }
             }
             Random rd = new Random();
-            int alive = TmAlive();
             while (responses < tm_stubs.Count)
             {
                 Monitor.Wait(st, rd.Next(100, 150));
@@ -82,7 +81,7 @@ namespace DADTKV_TM.Contact
             Console.Write("RESULTADO PROPAGATE CHEGOU AOS TMs? ");
             Console.WriteLine(acks);
 
-            return acks == alive;
+            return acks == TmAlive();
         }
         public bool[] DeleteResidualKeys(List<FullLease> residualLeases, int epoch, Store st) 
         {
@@ -121,7 +120,6 @@ namespace DADTKV_TM.Contact
                 }
             }
             Random rd = new Random();
-            int alive = TmAlive();
             while (responses < tm_stubs.Count)
             {
                 Monitor.Wait(st, rd.Next(100, 150));
@@ -150,6 +148,7 @@ namespace DADTKV_TM.Contact
             foreach (int i in acks) Console.Write(i + " ");
             bool[] bools = new bool[residualLeases.Count];
             Console.WriteLine("ACKS");
+            int alive = TmAlive();
             for (int i = 0; i < acks.Length; i++)
             {
                 Console.Write(acks[i] + " ");
