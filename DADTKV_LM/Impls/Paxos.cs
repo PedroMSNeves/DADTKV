@@ -40,7 +40,6 @@ namespace DADTKV_LM.Impls
 
             lock (_data)
             {
-                _data.RoundID = request.RoundId++;
                 _data.Epoch = request.Epoch;
                 int epoch = request.Epoch;
 
