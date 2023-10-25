@@ -13,12 +13,13 @@ namespace DADTKV_TM
             Environment.Exit(0);
         }
 
-        // Expected input: name, my_url, crash_ts, other_url, ..., LM (delimiter), lm_url, ..., SP (delimiter), sp_ts, sp_id, ...
+        // Expected input: name, my_url, crash_ts, other_url, ..., LM (delimiter), lm_url, ..., SP (delimiter), sp_ts, sp_id, ..., CP (delimeter), cp_ts, cp_id, ...
         public static void Main(string[] args)
         {
             List<string> tm_urls = new List<string>();
             List<string> lm_urls = new List<string>();
             Dictionary<int, List<string>> suspected_processes = new Dictionary<int, List<string>>(); // <timeslot, process_ids>
+            Dictionary<int, List<string>> crashed_processes = new Dictionary<int, List<string>>(); // <timeslot, process_ids>
 
             //Console.WriteLine("TM");
             //foreach (string s in args) Console.Write(s + " ");
@@ -33,6 +34,7 @@ namespace DADTKV_TM
 
             bool lm = false;
             bool sp = false;
+            bool cp = false;
             int currentTimeslot = -1;
             for (int i = 3; i < args.Length; i++)
             {
@@ -44,6 +46,12 @@ namespace DADTKV_TM
                 {
                     lm = false;
                     sp = true;
+                }
+                else if (args[i].Equals("CP"))
+                {
+                    sp = false;
+                    cp = true;
+                    currentTimeslot = -1;
                 }
                 else if (!lm && !sp)
                 {
@@ -65,6 +73,21 @@ namespace DADTKV_TM
                     else if (currentTimeslot != -1)
                     {
                         suspected_processes[currentTimeslot].Add(args[i]);
+                    }
+                }
+                else if (cp)
+                {
+                    if (args[i].All(char.IsDigit))
+                    {
+                        currentTimeslot = int.Parse(args[i]);
+                        if (!crashed_processes.ContainsKey(currentTimeslot))
+                        {
+                            crashed_processes[currentTimeslot] = new List<string>();
+                        }
+                    }
+                    else if (currentTimeslot != -1)
+                    {
+                        crashed_processes[currentTimeslot].Add(args[i]);
                     }
                 }
             }
