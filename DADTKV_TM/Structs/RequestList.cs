@@ -106,5 +106,9 @@ namespace DADTKV_TM.Structs
             }
             return resultT;
         }
+        public void CrashedServer(string name)
+        {
+            _lmContact.CrashedServer(name);
+        }
     }
 }

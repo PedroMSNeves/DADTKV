@@ -90,6 +90,11 @@ namespace DADTKV_TM
         {
             _triesBeforeDropingRequest = tries;
         }
+        public void CrashedServer(string name)
+        {
+            _tmContact.CrashedServer(name);
+            _reqList.CrashedServer(name);
+        }
         //////////////////////////////////////////////USED BY SERVERSERVICE////////////////////////////////////////////////////////////
         /// <summary>
         /// Used by the ServerService class (add new client transactions)

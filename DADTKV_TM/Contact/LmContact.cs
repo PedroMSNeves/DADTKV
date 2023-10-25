@@ -33,6 +33,23 @@ namespace DADTKV_TM.Contact
             bitmap = new bool[lm_channels.Count];
             for (int i = 0; i < bitmap.Length; i++) bitmap[i] = true;
         }
+
+        /// <summary>
+        /// Puts the server down
+        /// </summary>
+        /// <param name="name"></param>
+        public void CrashedServer(string name)
+        {
+            for (int i = 0; i < lm_names.Count; i++)
+            {
+                if (lm_names[i] == name)
+                {
+                    bitmap[i] = false;
+                    break;
+                }
+            }
+        }
+
         public bool RequestLease(List<string> keys, int leaseId)
         {
             List<Grpc.Core.AsyncUnaryCall<LeaseReply>> replies = new List<Grpc.Core.AsyncUnaryCall<LeaseReply>>();

@@ -31,6 +31,23 @@ namespace DADTKV_TM.Contact
             bitmap = new bool[tm_channels.Count];
             for (int i = 0; i < bitmap.Length; i++) bitmap[i] = true;
         }
+
+        /// <summary>
+        /// Puts the server down
+        /// </summary>
+        /// <param name="name"></param>
+        public void CrashedServer(string name)
+        {
+            for (int i = 0; i < tm_names.Count; i++)
+            {
+                if (tm_names[i] == name)
+                {
+                    bitmap[i] = false;
+                    break;
+                }
+            }
+        }
+
         public bool BroadCastChanges(string name, int leaseId, int epoch, Store st)
         {
             List<Grpc.Core.AsyncUnaryCall<BroadReply>> replies = new List<Grpc.Core.AsyncUnaryCall<BroadReply>>();
