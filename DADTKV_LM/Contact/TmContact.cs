@@ -60,7 +60,7 @@ namespace DADTKV_LM.Contact
                     tm_stubs.Add(new LeaseService.LeaseServiceClient(channel));
                 }
             }
-            if (AliveTMs() <= Majority()) return false;
+            //if (AliveTMs() <= Majority()) return false;
 
             for (int i = 0; i < tm_stubs.Count; i++)
             {
@@ -72,7 +72,7 @@ namespace DADTKV_LM.Contact
                 }
                 else replies.Add(null);
             }
-            while (responses < tm_stubs.Count && acks <= Majority())
+            while (responses < tm_stubs.Count)
             {
                 for (int i = 0; i < replies.Count; i++)
                 {
@@ -89,22 +89,14 @@ namespace DADTKV_LM.Contact
                                 acks++;
                             }
                             responses++;
-                            replies.Remove(replies[i]);
-                            i--;
-                            if (acks > Majority()) break;
+                            replies[i] = null;
                         }
-                    }
-                    else
-                    {
-                        responses++;
-                        replies.Remove(replies[i]);
-                        i--;
                     }
                 }
             }
             Console.Write("RESULTADO PAXOS CHEGOU AOS TMs? ");
             Console.WriteLine(acks);   
-            return acks > Majority();
+            return acks == AliveTMs();
         }
         private int Majority()
         {

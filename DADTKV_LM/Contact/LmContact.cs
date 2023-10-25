@@ -38,7 +38,7 @@ namespace DADTKV_LM.Contact
             }
             return -1;
         }
-        private int Majority()
+        private int Majority() //aqui contar os que estão alive
         {
             return (int)Math.Floor((decimal)((lm_stubs.Count + 1) / 2));
         }
@@ -179,21 +179,11 @@ namespace DADTKV_LM.Contact
                             {
                                 lm_bitmap[i] = false;
                             }
-                            else if (replies[i].ResponseAsync.Result.Ack == true)
-                            {
-                                acks++;
-                            }
+                            else if (replies[i].ResponseAsync.Result.Ack == true) acks++;
                             responses++;
-                            replies.Remove(replies[i]);
-                            i--;
+                            replies[i] = null;
                             if (acks > Majority()) break;
                         }
-                    }
-                    else
-                    {
-                        responses++;
-                        replies.Remove(replies[i]);
-                        i--;
                     }
                 }
             }
