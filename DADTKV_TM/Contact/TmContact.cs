@@ -222,5 +222,17 @@ namespace DADTKV_TM.Contact
             foreach (bool b in bitmap) if (b) count++;
             return count;
         }
+        public List<string> GetDeadNames()
+        {
+            List<string> names = new List<string>();
+            for (int i = 0; i < tm_names.Count; i++)
+            {
+                if (!bitmap[i])
+                {
+                    names.Add(tm_names[i]);
+                }
+            }
+            return names;
+        }
     }
 }
