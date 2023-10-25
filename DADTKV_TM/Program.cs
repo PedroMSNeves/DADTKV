@@ -13,11 +13,11 @@ namespace DADTKV_TM
             Environment.Exit(0);
         }
 
-        // Expected input: name, my_url, crash_ts, other_url, ..., LM (delimiter), lm_url, ..., SP (delimiter), sp_ts, sp_id, ..., CP (delimeter), cp_ts, cp_id, ...
+        // Expected input: name, my_url, crash_ts, other_id, other_url, ..., LM (delimiter), lm_id, lm_url, ..., SP (delimiter), sp_ts, sp_id, ..., CP (delimeter), cp_ts, cp_id, ...
         public static void Main(string[] args)
         {
-            List<string> tm_urls = new List<string>();
-            List<string> lm_urls = new List<string>();
+            Dictionary<string, string> tm_urls = new Dictionary<string, string>();
+            Dictionary<string, string> lm_urls = new Dictionary<string, string>();
             Dictionary<int, List<string>> suspected_processes = new Dictionary<int, List<string>>(); // <timeslot, process_ids>
             Dictionary<int, List<string>> crashed_processes = new Dictionary<int, List<string>>(); // <timeslot, process_ids>
 
@@ -25,7 +25,7 @@ namespace DADTKV_TM
             //foreach (string s in args) Console.Write(s + " ");
 
             // Minimum is name, his own url, when to crash, the LM delimiter and 1 Lm url
-            if (args.Length < 5) exitOnError("Invalid number of arguments");
+            if (args.Length < 6) exitOnError("Invalid number of arguments");
 
             Uri my_url = new Uri(args[1]);;
             ServerPort serverPort = new ServerPort(my_url.Host, my_url.Port, ServerCredentials.Insecure);
@@ -55,11 +55,13 @@ namespace DADTKV_TM
                 }
                 else if (!lm && !sp)
                 {
-                    tm_urls.Add(args[i]);
+                    tm_urls.Add(args[i], args[i + 1]);
+                    i++;
                 }
                 else if (lm && !sp)
                 {
-                    lm_urls.Add(args[i]);
+                    lm_urls.Add(args[i], args[i + 1]);
+                    i++;
                 }
                 else if (sp) {
                     if (args[i].All(char.IsDigit))
@@ -93,19 +95,19 @@ namespace DADTKV_TM
             }
 
             Console.WriteLine("TM");
-            foreach (string url in tm_urls) { Console.WriteLine(url); }
+            foreach (KeyValuePair<string, string> url in tm_urls) { Console.WriteLine(url.Value); }
             Console.WriteLine("LM");
-            foreach (string url in lm_urls) { Console.WriteLine(url); }
+            foreach (KeyValuePair<string, string> url in lm_urls) { Console.WriteLine(url.Value); }
 
             if (!lm) exitOnError("No LeaseManagers provided");
 
             // Store is shared by the various services
-            Store st = new Store(args[0], tm_urls, lm_urls);
+            Store st = new Store(args[0], tm_urls.Values.ToList(), lm_urls.Values.ToList());
             Server server = new Server
             {
                 Services = { TmService.BindService(new ServerService(st, args[0])),
                             BroadCastService.BindService(new BroadService(st)),
-                            LeaseService.BindService(new LService(st, lm_urls.Count)) },
+                            LeaseService.BindService(new LService(st, lm_urls.Values.ToList().Count)) },
                 Ports = { serverPort }
             };
 

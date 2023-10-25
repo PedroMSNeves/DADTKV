@@ -14,27 +14,27 @@ namespace DADTKV_LM
             Environment.Exit(0);
         }
 
-        // Expected input: name, my_url, id, numTimeSlots, startingTime, timeSlotDuration, crash_ts, other_lm_url, ..., TM (delimiter), tm_url, ..., SP (delimiter), sp_ts, sp_id, ..., CP (delimeter), cp_ts, cp_id, ...
+        // Expected input: name, my_url, id, numTimeSlots, startingTime, timeSlotDuration, crash_ts, other_lm_id, other_lm_url, ..., TM (delimiter), tm_id, tm_url, ..., SP (delimiter), sp_ts, sp_id, ..., CP (delimeter), cp_ts, cp_id, ...
         public static void Main(string[] args)
         {
             Console.WriteLine("LM");
             foreach (string s in args) Console.Write(s + " ");
-            
-            List<string> tm_urls = new List<string>();
-            List<string> lm_urls = new List<string>();
+
+            Dictionary<string, string> tm_urls = new Dictionary<string, string>();
+            Dictionary<string, string> lm_urls = new Dictionary<string, string>();
             Dictionary<int, List<string>> suspected_processes = new Dictionary<int, List<string>>(); // <timeslot, process_ids>
             Dictionary<int, List<string>> crashed_processes = new Dictionary<int, List<string>>(); // <timeslot, process_ids>
-            
+
             // Minimum is name, his own url, id, numTimeSlots, startingTime, timeSlotDuration, crash_ts, the TM delimiter and 1 TM url
-            if (args.Length < 9) exitOnError("Invalid number of arguments");
-            
+            if (args.Length < 10) exitOnError("Invalid number of arguments");
+
             Uri my_url = new Uri(args[1]);
             ServerPort serverPort = new ServerPort(my_url.Host, my_url.Port, ServerCredentials.Insecure);
-            
+
             if (!Int32.TryParse(args[2], out int id)) exitOnError("Invalid ID format");
-            
+
             int crash_ts = Int32.Parse(args[6]);
-            
+
             bool tm = false;
             bool sp = false;
             bool cp = false;
@@ -42,28 +42,35 @@ namespace DADTKV_LM
             for (int i = 7; i < args.Length; i++)
             {
                 // Console.WriteLine(tm + ": " + args[i]);
-                if (args[i].Equals("TM")) {
-                    tm = true;                   
+                if (args[i].Equals("TM"))
+                {
+                    tm = true;
                 }
-                else if (args[i].Equals("SP")) {
+                else if (args[i].Equals("SP"))
+                {
                     tm = false;
                     sp = true;
                 }
-                else if (args[i].Equals("CP")) {
+                else if (args[i].Equals("CP"))
+                {
                     sp = false;
                     cp = true;
                     currentTimeslot = -1;
                 }
                 else if (!tm && !sp)
                 {
-                    lm_urls.Add(args[i]);
+                    lm_urls.Add(args[i], args[i + 1]);
+                    i++;
                 }
                 else if (tm && !sp)
                 {
-                    tm_urls.Add(args[i]);
+                    tm_urls.Add(args[i], args[i + 1]);
+                    i++;
                 }
-                else if (sp) {
-                    if (args[i].All(char.IsDigit)) {
+                else if (sp)
+                {
+                    if (args[i].All(char.IsDigit))
+                    {
                         currentTimeslot = int.Parse(args[i]);
                         if (!suspected_processes.ContainsKey(currentTimeslot))
                         {
@@ -75,8 +82,10 @@ namespace DADTKV_LM
                         suspected_processes[currentTimeslot].Add(args[i]);
                     }
                 }
-                else if (cp) {
-                    if (args[i].All(char.IsDigit)) {
+                else if (cp)
+                {
+                    if (args[i].All(char.IsDigit))
+                    {
                         currentTimeslot = int.Parse(args[i]);
                         if (!crashed_processes.ContainsKey(currentTimeslot))
                         {
@@ -98,8 +107,8 @@ namespace DADTKV_LM
 
             Server server = new Server
             {
-                Services = { LeaseService.BindService(new LeageManager(args[0], dt, tm_urls, lm_urls)) ,
-                            PaxosService.BindService(new Paxos(args[0], dt, tm_urls, lm_urls))},
+                Services = { LeaseService.BindService(new LeageManager(args[0], dt, tm_urls.Values.ToList(), lm_urls.Values.ToList())) ,
+                            PaxosService.BindService(new Paxos(args[0], dt, tm_urls.Values.ToList(), lm_urls.Values.ToList()))},
                 Ports = { serverPort }
             };
 
@@ -108,7 +117,7 @@ namespace DADTKV_LM
             int numTimeSlots = Int32.Parse(args[3]);
             int timeSlotDuration = Int32.Parse(args[5]);
 
-            PaxosLeader pl = new PaxosLeader(args[0], dt, id, tm_urls, lm_urls);
+            PaxosLeader pl = new PaxosLeader(args[0], dt, id, tm_urls.Values.ToList(), lm_urls.Values.ToList());
 
             Console.WriteLine("Insecure server listening on port " + my_url.Port);
             //Configuring HTTP for client connections in Register method
