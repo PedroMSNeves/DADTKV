@@ -212,6 +212,7 @@ namespace DADTKV_LM.Impls
         }
         public bool PrepareRequest(int epoch)
         {
+            Console.WriteLine("ROundID: "+_data.RoundID);
             PrepareRequest request = new PrepareRequest { RoundId = _data.RoundID, Epoch = epoch };
             return PrepareRequest(request, epoch);
         }
