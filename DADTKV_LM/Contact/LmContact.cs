@@ -204,6 +204,7 @@ namespace DADTKV_LM.Contact
                 }
             }
             AcceptReply reply;
+            if (!lm_bitmap[possible_leader]) return false;
             try 
             {
                 reply = lm_stubs[possible_leader].GetLeaderAckAsync(new AckRequest(), new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();

@@ -8,29 +8,31 @@ namespace DADTKV_LM.Impls
 {
     public class PaxosLeader
     {
+        private string _name;
         private LeaseData _data;
         LmContact _lmcontact;
         TmContact _tmContact;
         Dictionary<int, List<Request>> my_value;
         Dictionary<int, List<Request>> other_value;
         Dictionary<int, int> other_TS;
+        Dictionary<int, List<string>> _crashed;
 
 
         public PaxosLeader(string name, LeaseData data, int id, List<string> tm_urls, List<string> lm_urls)
         {
-            Name = name;
+            _name = name;
             _data = data;
             Id = id;
 
             _tmContact = new TmContact(tm_urls);
             _lmcontact = new LmContact(name, lm_urls);
+            _crashed = new Dictionary<int, List<string>>();
 
             my_value = new Dictionary<int, List<Request>>();
             other_value = new Dictionary<int, List<Request>>();
             other_TS = new Dictionary<int, int>();
 
         }
-        public string Name { get; }
         public List<Request> GetMyValue(int epoch){ return my_value[epoch]; }
         public void SetMyValue(int epoch, List<Request> req)
         {
@@ -90,28 +92,35 @@ namespace DADTKV_LM.Impls
             _data.Epoch = 1;
             bool ack = true;
             int possible_leader = 0;
+            int epoch;
 
             while (true) //wait until you are the leader
             {
                 //Console.WriteLine("Possible Leader: " + possible_leader);
                 //Console.WriteLine("Id: " + Id);
+                /*if (_crashed.ContainsKey(epoch))
+                {
+                    foreach (string name in _crashed[epoch])
+                    {
+                        if (name == _name) return;
+                        _store.CrashedServer(name);
+                    }
+                }*/
                 while (Id == possible_leader + 1 && ack) //if we are the next leader
                 {
-                    Thread.Sleep(5000); //dorme 5 sec e depois manda mensagem
-                    //lock (_data)
-                    //{
-                        possible_leader = _data.Possible_Leader;
-                        if (Id == possible_leader + 1) // depois ver tambem se é o seguinte no bitmap que esteja vivo
-                        {
-                            ack = _lmcontact.getLeaderAck(_data.Possible_Leader); //Contact the leader to see if he is alive
+                    Thread.Sleep(5000);
+                    possible_leader = _data.Possible_Leader;
+                    if (Id == possible_leader + 1) // depois ver tambem se é o seguinte no bitmap que esteja vivo
+                    {
+                        ack = _lmcontact.getLeaderAck(_data.Possible_Leader); //Contact the leader to see if he is alive
 
-                            if (!ack)
-                            {
-                                possible_leader++;
-                                _data.IsLeader = true;
-                            }
+                        if (!ack)
+                        {
+                            possible_leader++;
+                            _data.IsLeader = true;
                         }
-                   // }
+                    }
+                   
                 }
                 possible_leader = _data.Possible_Leader;
                 if (_data.IsLeader) break;
@@ -119,13 +128,18 @@ namespace DADTKV_LM.Impls
             for (int i = 0; i < numTimeSlots; i++)
             {
                 Console.WriteLine("New Paxos Instance");
-                int epoch = _data.Epoch;
-                _data.Epoch++;
+                epoch = _data.Epoch;
+
+                if (_crashed.ContainsKey(epoch))
+                {
+                    if (_crashed[epoch].Contains(_name)) return;
+                }
+            
                 Console.WriteLine("epoch: "+ epoch);
                 Thread t = new Thread(() => RunPaxosInstance(epoch));
-                t.Start();               
+                t.Start();
+                _data.Epoch++;
                 Thread.Sleep(timeSlotDuration);
-                //t.Join();
                 _data.RoundID++;
             }
         }
