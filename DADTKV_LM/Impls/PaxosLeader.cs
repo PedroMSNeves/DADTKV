@@ -95,7 +95,7 @@ namespace DADTKV_LM.Impls
         /// </summary>
         public void cycle(int timeSlotDuration, int numTimeSlots)
         {
-            _data.Epoch = 1;
+            _data.Epoch = 0;
             bool ack = true;
             int possible_leader = 0;
             int epoch;
@@ -139,6 +139,7 @@ namespace DADTKV_LM.Impls
             for (int i = 0; i < numTimeSlots; i++)
             {
                 Console.WriteLine("New Paxos Instance");
+                _data.Epoch++;
                 epoch = _data.Epoch;
                 if (epoch == _myCrashEpoch) return;
 
@@ -150,7 +151,6 @@ namespace DADTKV_LM.Impls
                         CrashedServer(name);
                     }
                 }
-                _data.Epoch++;
                 Console.WriteLine("epoch: "+ epoch);
                 Thread t = new Thread(() => RunPaxosInstance(epoch));
                 t.Start();               
@@ -218,32 +218,30 @@ namespace DADTKV_LM.Impls
         public bool PrepareRequest(PrepareRequest request, int epoch)
         {
             bool res;
-            //lock (this)
-           //{
-                Promise reply;
-                int promises = 1;
-                int numLMs = _lmcontact.NumLMs();
-                Console.WriteLine("num Stubs: "+ numLMs);
-                
-                for (int i = 0; i < numLMs; i++)
-                {
-                    reply = _lmcontact.PrepareRequest(request, i);
-                    if (reply.Ack) promises++;
 
-                    SetOtherTS(epoch, _data.GetWriteTS(epoch));
-                    if (reply.WriteTs > GetOtherTS(epoch))
+            Promise reply;
+            int promises = 1;
+            int numLMs = _lmcontact.NumLMs();
+            Console.WriteLine("num Stubs: "+ numLMs);
+            
+            for (int i = 0; i < numLMs; i++)
+            {
+                reply = _lmcontact.PrepareRequest(request, i);
+                if (reply.Ack) promises++;
+
+                SetOtherTS(epoch, _data.GetWriteTS(epoch));
+                if (reply.WriteTs > GetOtherTS(epoch))
+                {
+                    if (other_value.ContainsKey(epoch)) other_value[epoch].Clear();
+                    foreach (LeasePaxos l in reply.Leases)
                     {
-                        if (other_value.ContainsKey(epoch)) other_value[epoch].Clear();
-                        foreach (LeasePaxos l in reply.Leases)
-                        {
-                            other_value[epoch].Add(new Request(l.Tm, l.Keys.ToList(), l.LeaseId));
-                        }
-                        SetOtherTS(epoch, reply.WriteTs);
+                        other_value[epoch].Add(new Request(l.Tm, l.Keys.ToList(), l.LeaseId));
                     }
+                    SetOtherTS(epoch, reply.WriteTs);
                 }
-                res = promises > (numLMs + 1) / 2;
+            }
+            res = promises > (_lmcontact.AliveLMs() + 1) / 2;
             Console.WriteLine("lider consegue prepare: "+res);
-           // }
             return res;
         }
         public bool AcceptRequest(int epoch, int round_id)
