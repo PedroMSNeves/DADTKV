@@ -116,8 +116,8 @@ namespace DADTKV_LM
 
             Server server = new Server
             {
-                Services = { LeaseService.BindService(new LeageManager(args[0], dt, tm_urls.Values.ToList(), lm_urls.Values.ToList())) ,
-                            PaxosService.BindService(new Paxos(args[0], dt, tm_urls.Values.ToList(), lm_urls.Values.ToList()))},
+                Services = { LeaseService.BindService(new LeageManager(args[0], dt, tm_urls.Values.ToList(), lm_urls.Values.ToList(), tm_urls.Keys.ToList(), lm_urls.Keys.ToList())) ,
+                            PaxosService.BindService(new Paxos(args[0], dt, tm_urls.Values.ToList(), lm_urls.Values.ToList(), tm_urls.Keys.ToList(), lm_urls.Keys.ToList()))},
                 Ports = { serverPort }
             };
 
@@ -126,7 +126,7 @@ namespace DADTKV_LM
             int numTimeSlots = Int32.Parse(args[3]);
             int timeSlotDuration = Int32.Parse(args[5]);
 
-            PaxosLeader pl = new PaxosLeader(args[0], dt, id, tm_urls.Values.ToList(), lm_urls.Values.ToList());
+            PaxosLeader pl = new PaxosLeader(args[0], dt, id, crash_ts, tm_urls.Values.ToList(), lm_urls.Values.ToList(), tm_urls.Keys.ToList(), lm_urls.Keys.ToList(), crashed_processes);
 
             Console.WriteLine("Insecure server listening on port " + my_url.Port);
             //Configuring HTTP for client connections in Register method

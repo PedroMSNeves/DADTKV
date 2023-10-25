@@ -7,11 +7,12 @@ namespace DADTKV_LM.Contact
 {
     public class TmContact
     {
+        List<string> tm_names;
         List<LeaseService.LeaseServiceClient> tm_stubs = null;
         List<GrpcChannel> tm_channels = new List<GrpcChannel>();
         bool[] tm_bitmap;
 
-        public TmContact(List<string> tm_urls)
+        public TmContact(List<string> tm_urls, List<string> t_names)
         {
             foreach (string url in tm_urls)
             {
@@ -24,8 +25,20 @@ namespace DADTKV_LM.Contact
                     Console.WriteLine("ERROR: Invalid Tm server url");
                 }
             }
+            tm_names = t_names;
             tm_bitmap = new bool[tm_channels.Count];
             for (int i = 0; i < tm_bitmap.Length; i++) tm_bitmap[i] = true;
+        }
+        public void CrashedServer(string name)
+        {
+            for (int i = 0; i < tm_names.Count; i++)
+            {
+                if (tm_names[i] == name)
+                {
+                    tm_bitmap[i] = false;
+                    break;
+                }
+            }
         }
         private int AliveTMs()
         {
