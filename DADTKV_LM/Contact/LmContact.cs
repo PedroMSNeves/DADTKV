@@ -9,9 +9,10 @@ namespace DADTKV_LM.Contact
         private string _name;
         public List<PaxosService.PaxosServiceClient> lm_stubs = null;
         List<GrpcChannel> lm_channels = new List<GrpcChannel>();
+        List<string> lm_names;
         bool[] lm_bitmap;
 
-        public LmContact(string name, List<string> lm_urls)
+        public LmContact(string name, List<string> lm_urls, List<string> l_names)
         {
             _name = name;
             foreach (string url in lm_urls) 
@@ -20,6 +21,18 @@ namespace DADTKV_LM.Contact
             }
             lm_bitmap = new bool[lm_urls.Count];
             for (int i = 0; i < lm_bitmap.Length; i++) lm_bitmap[i] = true;
+            lm_names = l_names;
+        }
+        public void CrashedServer(string name)
+        {
+            for (int i = 0; i < lm_names.Count; i++)
+            {
+                if (lm_names[i] == name)
+                {
+                    lm_bitmap[i] = false;
+                    break;
+                }
+            }
         }
         public int CheckPossibleLeader(int possibleLeader)
         {

@@ -9,28 +9,30 @@ namespace DADTKV_LM.Impls
     public class PaxosLeader
     {
         private LeaseData _data;
+        private string _name;
         LmContact _lmcontact;
         TmContact _tmContact;
         Dictionary<int, List<Request>> my_value;
         Dictionary<int, List<Request>> other_value;
         Dictionary<int, int> other_TS;
+        public Dictionary<int, List<string>> _crashed;
+        int _myCrashEpoch;
 
-
-        public PaxosLeader(string name, LeaseData data, int id, List<string> tm_urls, List<string> lm_urls)
+        public PaxosLeader(string name, LeaseData data, int id, int crash_ts, List<string> tm_urls, List<string> lm_urls, List<string> tm_names, List<string> lm_names, Dictionary<int, List<string>> crashedP)
         {
-            Name = name;
+            _name = name;
             _data = data;
             Id = id;
+            _myCrashEpoch = crash_ts;
 
-            _tmContact = new TmContact(tm_urls);
-            _lmcontact = new LmContact(name, lm_urls);
+            _tmContact = new TmContact(tm_urls, tm_names);
+            _lmcontact = new LmContact(name, lm_urls, lm_names);
 
             my_value = new Dictionary<int, List<Request>>();
             other_value = new Dictionary<int, List<Request>>();
             other_TS = new Dictionary<int, int>();
-
+            _crashed = crashedP;
         }
-        public string Name { get; }
         public List<Request> GetMyValue(int epoch){ return my_value[epoch]; }
         public void SetMyValue(int epoch, List<Request> req)
         {
@@ -82,6 +84,12 @@ namespace DADTKV_LM.Impls
         public void SetOtherTS(int epoch, int val) { lock (this) { other_TS[epoch] = val; } }
         public int Id { get; set; }
 
+        public void CrashedServer(string name)
+        {
+            _tmContact.CrashedServer(name);
+            _lmcontact.CrashedServer(name);
+        }
+
         /// <summary>
         /// LMs wait until they are leaders
         /// </summary>
@@ -90,11 +98,23 @@ namespace DADTKV_LM.Impls
             _data.Epoch = 1;
             bool ack = true;
             int possible_leader = 0;
+            int epoch;
 
             while (true) //wait until you are the leader
             {
                 //Console.WriteLine("Possible Leader: " + possible_leader);
                 //Console.WriteLine("Id: " + Id);
+                epoch = _data.Epoch;
+                if (epoch == _myCrashEpoch) return;
+
+                if (_crashed.ContainsKey(epoch))
+                {
+                    foreach (string name in _crashed[epoch])
+                    {
+                        // If we are not signaled to crash, we look for the name that crashed
+                        CrashedServer(name);
+                    }
+                }
                 while (Id == possible_leader + 1 && ack) //if we are the next leader
                 {
                     Thread.Sleep(5000); //dorme 5 sec e depois manda mensagem
@@ -119,7 +139,17 @@ namespace DADTKV_LM.Impls
             for (int i = 0; i < numTimeSlots; i++)
             {
                 Console.WriteLine("New Paxos Instance");
-                int epoch = _data.Epoch;
+                epoch = _data.Epoch;
+                if (epoch == _myCrashEpoch) return;
+
+                if (_crashed.ContainsKey(epoch))
+                {
+                    foreach (string name in _crashed[epoch])
+                    {
+                        // If we are not signaled to crash, we look for the name that crashed
+                        CrashedServer(name);
+                    }
+                }
                 _data.Epoch++;
                 Console.WriteLine("epoch: "+ epoch);
                 Thread t = new Thread(() => RunPaxosInstance(epoch));

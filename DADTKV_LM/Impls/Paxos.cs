@@ -12,14 +12,14 @@ namespace DADTKV_LM.Impls
         LmContact _lmcontact;
         TmContact _tmContact;
 
-        public Paxos(string name, LeaseData data, List<string> tm_urls, List<string> lm_urls)
+        public Paxos(string name, LeaseData data, List<string> tm_urls, List<string> lm_urls, List<string> tm_names, List<string> lm_names)
         {
             Name = name;
             _data = data;
             //When paxos is called needs to select the requests that don´t conflict to define our value
             My_value = _data.GetMyValue(); //quando é que fazemos isto?
-            _tmContact = new TmContact(tm_urls);
-            _lmcontact = new LmContact(name, lm_urls);
+            _tmContact = new TmContact(tm_urls, tm_names);
+            _lmcontact = new LmContact(name, lm_urls, lm_names);
         }
         public string Name { get; }
         public List<Request> My_value { set; get; }
