@@ -44,6 +44,7 @@ namespace DADTKV_TM.Contact
             {
                 if (lm_names[i] == name)
                 {
+                    Console.WriteLine(name + " " + "TestApagar");
                     bitmap[i] = false;
                     break;
                 }

@@ -87,14 +87,14 @@ namespace DADTKV_LM
                     if (args[i].All(char.IsDigit))
                     {
                         currentTimeslot = int.Parse(args[i]);
-                        if (!crashed_processes.ContainsKey(currentTimeslot))
+                        if (!crashed_processes.ContainsKey(currentTimeslot + 1))
                         {
-                            crashed_processes.Add(currentTimeslot, new List<string>());
+                            crashed_processes.Add(currentTimeslot + 1, new List<string>());
                         }
                     }
                     else if (currentTimeslot != -1)
                     {
-                        crashed_processes[currentTimeslot].Add(args[i]);
+                        crashed_processes[currentTimeslot + 1].Add(args[i]);
                     }
                 }
             }

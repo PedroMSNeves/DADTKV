@@ -105,7 +105,7 @@ namespace DADTKV_LM.Impls
                 //Console.WriteLine("Possible Leader: " + possible_leader);
                 //Console.WriteLine("Id: " + Id);
                 
-                while (Id == possible_leader + 1 && ack) //if we are the next leader
+                if (Id == possible_leader + 1 && ack) //if we are the next leader
                 {
                     Thread.Sleep(5000); //dorme 5 sec e depois manda mensagem
                     
@@ -121,35 +121,19 @@ namespace DADTKV_LM.Impls
                         }
                     }
                     epoch = _data.Epoch;
-                    for (int i = epoch + 1; i <= epoch; i++)
-                    {
-                        // If we are signaled to crash, we close the servers and then end the program
-                        if (epoch == _myCrashEpoch) return;
-
-                        if (_crashed.ContainsKey(i))
-                        {
-                            foreach (string name in _crashed[i])
-                            {
-                                // If we are not signaled to crash, we look for the name that crashed
-                                CrashedServer(name);
-                            }
-                        }
-                    }
+                    
                 }
                 possible_leader = _data.Possible_Leader;
                 if (_data.IsLeader) break;
 
                 epoch = _data.Epoch;
-                for (int i = epoch + 1; i <= epoch; i++)
+                for (int i = 1; i <= epoch; i++)
                 {
-                    // If we are signaled to crash, we close the servers and then end the program
-                    if (epoch == _myCrashEpoch) return;
-
+                    if (_myCrashEpoch != -1 && epoch >= _myCrashEpoch) return;
                     if (_crashed.ContainsKey(i))
                     {
                         foreach (string name in _crashed[i])
                         {
-                            // If we are not signaled to crash, we look for the name that crashed
                             CrashedServer(name);
                         }
                     }
@@ -159,29 +143,27 @@ namespace DADTKV_LM.Impls
             {
                 Console.WriteLine("New Paxos Instance");
                 _data.Epoch++;
-                epoch = _data.Epoch;
-                if (epoch == _myCrashEpoch) return;
 
-                Console.WriteLine("epoch: "+ epoch);
-                Thread t = new Thread(() => RunPaxosInstance(epoch));
-                t.Start();               
-                Thread.Sleep(timeSlotDuration);
+                epoch = _data.Epoch;          
 
-                for (int j = epoch + 1; j <= epoch; j++)
+                for (int j = 1; j <= epoch; j++)
                 {
                     // If we are signaled to crash, we close the servers and then end the program
-                    if (epoch == _myCrashEpoch) return;
+                    if (_myCrashEpoch != -1 && epoch >= _myCrashEpoch) return; 
 
                     if (_crashed.ContainsKey(j))
                     {
                         foreach (string name in _crashed[j])
                         {
                             // If we are not signaled to crash, we look for the name that crashed
-                            CrashedServer(name);
+                            //CrashedServer(name);
                         }
                     }
                 }
-                //t.Join();
+                Console.WriteLine("epoch: "+ epoch);
+                Thread t = new Thread(() => RunPaxosInstance(epoch));
+                t.Start();               
+                Thread.Sleep(timeSlotDuration);
                 _data.RoundID++;
             }
         }
@@ -240,6 +222,7 @@ namespace DADTKV_LM.Impls
         public bool PrepareRequest(int epoch)
         {
             Console.WriteLine("ROundID: "+_data.RoundID);
+            _data.SetReadTS(epoch, _data.RoundID);
             PrepareRequest request = new PrepareRequest { RoundId = _data.RoundID, Epoch = epoch };
             return PrepareRequest(request, epoch);
         }

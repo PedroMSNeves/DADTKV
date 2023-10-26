@@ -35,6 +35,7 @@ namespace DADTKV_LM.Impls
         public Promise Prep(PrepareRequest request) 
         {
             Promise reply;
+            Console.WriteLine("RECEBI PREPARE");
             Console.WriteLine("leader_id: "+request.LeaderId);
             Console.WriteLine("epoch: "+request.Epoch);
 
