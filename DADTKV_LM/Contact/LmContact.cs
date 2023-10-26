@@ -132,7 +132,7 @@ namespace DADTKV_LM.Contact
                     t.Start();
                 }
                 while (!(values[0] + 1 >= (NumLMs() + 1) / 2 || values[1] >= (NumLMs() + 1) / 2)) Monitor.Wait(this);
-                if (values[0] + 1 > Majority()) return true;
+                if (values[0] + 1 >= Majority()) return true;
                 else return false;
             }
         }
