@@ -107,6 +107,7 @@ namespace DADTKV_LM.Impls
                 {
                     if (request.WriteTs == _data.GetReadTS(epoch)) // se isto nao acontecer e porque deu promise entretanto
                     {
+                        Console.WriteLine("Vou aceitar o pedido");
                         reply.Ack = true;
                         My_value.Clear();
                         foreach (LeasePaxos l in request.Leases)

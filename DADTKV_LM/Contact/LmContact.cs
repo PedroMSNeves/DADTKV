@@ -132,7 +132,7 @@ namespace DADTKV_LM.Contact
                     t.Start();
                 }
                 while (!(values[0] + 1 >= (NumLMs() + 1) / 2 || values[1] >= (NumLMs() + 1) / 2)) Monitor.Wait(this);
-                if (values[0] + 1 >= (AliveLMs() + 1) / 2) return true;
+                if (values[0] + 1 > Majority()) return true;
                 else return false;
             }
         }
@@ -141,10 +141,7 @@ namespace DADTKV_LM.Contact
             Console.WriteLine("NEW THREAD TO SEND ACCEPTED TO OTHERS");
             try
             {
-                Console.WriteLine("tamanho: " + lm_bitmap.Length);
-                Console.WriteLine("index: " + i);
-
-                if (lm_bitmap[i]) //erro de index mas pq
+                if (lm_bitmap[i])
                 {
                     AcceptReply reply = lm_stubs[i].AcceptedAsync(request).GetAwaiter().GetResult();
                     lock (this)
