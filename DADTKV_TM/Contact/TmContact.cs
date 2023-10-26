@@ -94,6 +94,7 @@ namespace DADTKV_TM.Contact
                         {
                             if (replies[i].ResponseAsync.IsFaulted)
                             {
+                                Console.WriteLine(replies[i].ResponseAsync.Exception.ToString());
                                 bitmap[i] = false;
                             }
                             else if (replies[i].ResponseAsync.Result.Ack == true) acks++;

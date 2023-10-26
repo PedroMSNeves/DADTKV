@@ -20,6 +20,8 @@ namespace DADTKV_TM.Impls
         }
         public BroadReply BCast(BroadRequest request)
         {
+            // Verification to deny response to dead Tms
+            foreach (string name in store.GetDeadNamesTm()) if(name == request.TmName) throw new RpcException(new Status(StatusCode.Aborted, "You are dead"));
             // Sees if it can write the request
             return new BroadReply { Ack = store.TestWrite(request.TmName, request.LeaseId, request.Epoch) };
         }
@@ -43,6 +45,8 @@ namespace DADTKV_TM.Impls
         }
         public ResidualReply RDeletion(ResidualDeletionRequest request)
         {
+            // Verification to deny response to dead Tms
+            foreach (string name in store.GetDeadNamesTm()) if (name == request.ResidualLeases[0].Tm) throw new RpcException(new Status(StatusCode.Aborted, "You are dead"));
             ResidualReply reply = new ResidualReply();
             Console.WriteLine("REceived new residualDeletion");
 

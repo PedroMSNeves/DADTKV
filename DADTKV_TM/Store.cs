@@ -579,7 +579,7 @@ namespace DADTKV_TM
                     Console.WriteLine(rq.Transaction_number +" "  + rq.Lease_number );
                 }
                 // Dead tms, remove leases
-                List<string> dead = GetDeadNames();
+                List<string> dead = GetDeadNamesTm();
                 List<FullLease> remove = new List<FullLease>();
                 foreach (FullLease fulllease in _fullLeases)
                 {
@@ -653,9 +653,13 @@ namespace DADTKV_TM
             _fullLeases.Remove(lease);
             return true;
         }
-        public List<string> GetDeadNames()
+        public List<string> GetDeadNamesTm()
         {
             return _tmContact.GetDeadNames();
+        }
+        public List<string> GetDeadNamesLm()
+        {
+            return _reqList.GetDeadNames();
         }
     }
 }

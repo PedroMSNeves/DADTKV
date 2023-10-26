@@ -37,6 +37,10 @@ namespace DADTKV_TM.Impls
             List<FullLease> leases = new List<FullLease>();
             bool ready = false;
             bool exists = false;
+
+            // Verification to deny response to dead Lms
+            // foreach (string name in _store.GetDeadNamesLm()) if (name == request.LmName) throw new RpcException(new Status(StatusCode.Aborted, "You are dead"));
+
             lock (waitLeases)
             {
                 Console.WriteLine("EPOCH: " + request.Epoch);

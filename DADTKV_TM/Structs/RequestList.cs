@@ -110,5 +110,9 @@ namespace DADTKV_TM.Structs
         {
             _lmContact.CrashedServer(name);
         }
+        public List<string> GetDeadNames()
+        {
+            return _lmContact.GetDeadNames();
+        }
     }
 }
