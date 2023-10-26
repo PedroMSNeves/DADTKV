@@ -84,7 +84,11 @@ namespace DADTKV_LM.Contact
                     replies.Add(tm_stubs[i].LeaseBroadCastAsync(request));
                     Console.WriteLine("DONE");
                 }
-                else replies.Add(null);
+                else
+                {
+                    replies.Add(null);
+                    responses++;
+                }
             }
             while (responses < tm_stubs.Count)
             {
