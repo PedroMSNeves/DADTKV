@@ -83,7 +83,6 @@ namespace DADTKV_TM.Contact
                 }
             }
             // Has to contact all the Alive Lm's
-            int alive = LmAlive();
             while (responses < lm_stubs.Count)
             {
                 for (int i = 0; i < replies.Count; i++)
@@ -110,7 +109,7 @@ namespace DADTKV_TM.Contact
             // Confirmation(_name, leaseId, acks > Majority());
             Console.Write("LEASE REQUEST CHEGOU AOS LMs? ");
             Console.WriteLine(acks);
-            return acks == alive;
+            return acks == LmAlive();
         }
 
         private int Majority()

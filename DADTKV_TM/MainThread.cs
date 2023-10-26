@@ -5,6 +5,7 @@
         Store _store;
         public int _myCrashEpoch;
         public Dictionary<int, List<string>> _crashedP;
+        int _last_epoch_read = -1;
         public MainThread(Store st, int myCrashEpoch, Dictionary<int, List<string>> crashedP)
         {
             _store = st;
@@ -22,19 +23,24 @@
                 lock (_store)
                 {
                     int epoch = _store.GetEpoch();
-                    // If we are signaled to crash, we close the servers and then end the program
-                    if (epoch == _myCrashEpoch) return; 
 
                     // To see if someone crashed
-                    if (_crashedP.ContainsKey(epoch))
+                    for (int i = _last_epoch_read + 1; i <= epoch; i++)
                     {
-                        foreach (string name in _crashedP[epoch])
-                        {
+                        // If we are signaled to crash, we close the servers and then end the program
+                        if (epoch == _myCrashEpoch) return;
 
-                            // If we are not signaled to crash, we look for the name that crashed
-                            _store.CrashedServer(name);
+                        if (_crashedP.ContainsKey(i))
+                        {
+                            foreach (string name in _crashedP[i])
+                            {
+                                // If we are not signaled to crash, we look for the name that crashed
+                                _store.CrashedServer(name);
+                            }
                         }
                     }
+                    _last_epoch_read = epoch;
+
                 }
             }
         }
