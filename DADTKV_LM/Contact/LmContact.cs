@@ -131,7 +131,7 @@ namespace DADTKV_LM.Contact
                     Thread t = new Thread(() => { sendAccepted(ref values, j, request); });
                     t.Start();
                 }
-                while (!(values[0] + 1 >= (NumLMs() + 1) / 2 || values[1] >= (NumLMs() + 1) / 2)) Monitor.Wait(this);
+                while (!(values[0] + 1 >= Majority() || values[1] >= Majority())) Monitor.Wait(this);
                 if (values[0] + 1 >= Majority()) return true;
                 else return false;
             }
