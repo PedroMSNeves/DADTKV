@@ -40,6 +40,14 @@ namespace DADTKV_LM.Contact
                 }
             }
         }
+        public bool Alive(string name)
+        {
+            for (int i = 0; i < tm_names.Count; i++)
+            {
+                if (tm_names[i] == name && tm_bitmap[i]) return true;
+            }
+            return false;
+        }
         private int AliveTMs()
         {
             int count = 0;
