@@ -22,6 +22,7 @@
                 Thread.Sleep(rd.Next(100,500));
                 lock (_store)
                 {
+                    if (_store.GetKillMe()) return;
                     int epoch = _store.GetEpoch();
 
                     // To see if someone crashed

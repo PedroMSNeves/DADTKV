@@ -48,7 +48,7 @@ namespace DADTKV_TM.Contact
             }
         }
 
-        public bool BroadCastChanges(string name, int leaseId, int epoch, Store st)
+        public bool BroadCastChanges(string name, int leaseId, int epoch, ref bool killMe, Store st)
         {
             List<Grpc.Core.AsyncUnaryCall<BroadReply>> replies = new List<Grpc.Core.AsyncUnaryCall<BroadReply>>();
             BroadRequest request = new BroadRequest { TmName = name, LeaseId = leaseId, Epoch = epoch };
@@ -62,6 +62,12 @@ namespace DADTKV_TM.Contact
                 {
                     tm_stubs.Add(new BroadCastService.BroadCastServiceClient(channel));
                 }
+            }
+            // If true, we will never be able to reach majority
+            if (TmAlive() <= Majority())
+            {
+                killMe = true;
+                return false;
             }
             // Sends request to all the Alive Tm's
             for (int i = 0; i < tm_stubs.Count; i++)
@@ -102,7 +108,7 @@ namespace DADTKV_TM.Contact
 
             return acks == TmAlive();
         }
-        public bool[] DeleteResidualKeys(List<FullLease> residualLeases, int epoch, Store st) 
+        public bool[] DeleteResidualKeys(List<FullLease> residualLeases, int epoch, ref bool killMe, Store st) 
         {
             List<Grpc.Core.AsyncUnaryCall<ResidualReply>> replies = new List<Grpc.Core.AsyncUnaryCall<ResidualReply>>();
             ResidualDeletionRequest residualDeletionRequest = new ResidualDeletionRequest { Epoch = epoch };
@@ -124,6 +130,11 @@ namespace DADTKV_TM.Contact
                 {
                     tm_stubs.Add(new BroadCastService.BroadCastServiceClient(channel));
                 }
+            }
+            if (TmAlive() <= Majority())
+            {
+                killMe = true;
+                return null;
             }
             // Sends request to all the Alive Tm's
             for (int i = 0; i < tm_stubs.Count; i++)
@@ -215,6 +226,14 @@ namespace DADTKV_TM.Contact
             }
 
             return true;
+        }
+        /// <summary>
+        /// In reality is majority - 1
+        /// </summary>
+        /// <returns></returns>
+        private int Majority()
+        {
+            return (int)Math.Floor((decimal)((tm_stubs.Count+1) / 2)); // perguntar se é dos vivos ou do total
         }
         private int TmAlive()
         {

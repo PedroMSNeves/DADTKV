@@ -30,7 +30,7 @@ namespace DADTKV_TM.Structs
             if (buffer.Count == 0) return null;
             return buffer[0];
         }
-        public int Insert(Request req, bool lease, int tNum, Store st)
+        public int Insert(Request req, bool lease, int tNum, ref bool killMe, Store st)
         {
             int tnumber;
             while (buzy == MAX) Monitor.Wait(st);
@@ -38,7 +38,7 @@ namespace DADTKV_TM.Structs
             if (!lease)
             {
                 // Use of distinct because we only need one copy of each key
-                if (!_lmContact.RequestLease(req.Keys.Distinct().ToList(), tnumber)) return -1;
+                if (!_lmContact.RequestLease(req.Keys.Distinct().ToList(), tnumber, ref killMe)) return -1;
                 req.Lease_number = tnumber;
             }
             buffer.Add(req);
@@ -46,7 +46,7 @@ namespace DADTKV_TM.Structs
             Monitor.PulseAll(st);
             return tnumber;
         }
-        public int Insert(Request req, bool lease, Store st)
+        public int Insert(Request req, bool lease, ref bool killMe, Store st)
         {
             int tnumber;
             while (buzy == MAX) Monitor.Wait(st);
@@ -55,7 +55,7 @@ namespace DADTKV_TM.Structs
             if (!lease)
             {
                 // Use of distinct because we only need one copy of each key
-                if (!_lmContact.RequestLease(req.Keys.Distinct().ToList(), tnumber)) return -1;
+                if (!_lmContact.RequestLease(req.Keys.Distinct().ToList(), tnumber, ref killMe)) return -1;
                 req.Lease_number = tnumber;
             }
             buffer.Add(req);

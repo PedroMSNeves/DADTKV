@@ -19,6 +19,7 @@ namespace DADTKV_TM
         private int _epoch = 0; // Last epoch received
         private int tries;
         private int _triesBeforeDropingRequest;
+        private bool _KillMe = false;
         public Store(string name, int timeSlotDuration, List<string> tm_urls, List<string> lm_urls, List<string> tm_names, List<string> lm_names)
         {
             tries = timeSlotDuration / 25;
@@ -37,6 +38,7 @@ namespace DADTKV_TM
         /// </summary>
         public void IncrementEpoch() { _epoch++; }
 
+        public bool GetKillMe() { return _KillMe; }
         /// <summary>
         /// Find any lease that intersects with a particular lease (before the particular lease)
         /// </summary>
@@ -118,7 +120,13 @@ namespace DADTKV_TM
 
                 // Inserts the request into the queue, if no lease could be used, asks for a new one
                 Console.WriteLine("Insert");
-                tnum = _reqList.Insert(req,lease,this);
+                bool kill = false;
+                tnum = _reqList.Insert(req,lease, ref kill,this);
+                if (kill) 
+                { 
+                    _KillMe = true;
+                    return -1;
+                }
                 Console.WriteLine("Insert END");
 
             }
@@ -291,7 +299,13 @@ namespace DADTKV_TM
                 // Tries to use other existing leases
                 lease = verifyLease(req);
                 // If couldnt use an existing lease, requests a new one (and inserts the requests again)
-                err = _reqList.Insert(req, lease, req.Transaction_number, this);
+                bool killMe = false;
+                err = _reqList.Insert(req, lease, req.Transaction_number, ref killMe, this);
+                if (killMe)
+                {
+                    _KillMe = true;
+                    return;
+                }
                 if (err == -1)
                 {
                     // If couldnt request the lease from the Lm's marks the request has done with error
@@ -361,7 +375,13 @@ namespace DADTKV_TM
             // If we have writes we try to propagate them
             if(writes.Count != 0)
             {
-                bool ack = _tmContact.BroadCastChanges(_name, fl.Lease_number, fl.Epoch, this);
+                bool killMe = false;
+                bool ack = _tmContact.BroadCastChanges(_name, fl.Lease_number, fl.Epoch, ref killMe, this);
+                if (killMe)
+                {
+                    _KillMe = true;
+                    return -2;
+                }
                 _tmContact.ConfirmBroadChanges(writes, ack);
                 if(!ack) return -2;
             }
@@ -606,7 +626,9 @@ namespace DADTKV_TM
                 }
                 Console.WriteLine();
                 //Console.ReadKey();
-                bool[] bools = _tmContact.DeleteResidualKeys(leases, maxEpoch, this); // provavelmente ter uma array out para saber que leases podemos apagar
+                bool killMe = false;
+                bool[] bools = _tmContact.DeleteResidualKeys(leases, maxEpoch, ref killMe, this); // provavelmente ter uma array out para saber que leases podemos apagar
+                if (killMe) _KillMe = true;
                 if (bools == null) return;
 
                 if (_tmContact.ConfirmResidualDeletion(_name, bools, maxEpoch))

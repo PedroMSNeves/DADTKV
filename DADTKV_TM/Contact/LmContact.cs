@@ -50,7 +50,7 @@ namespace DADTKV_TM.Contact
             }
         }
 
-        public bool RequestLease(List<string> keys, int leaseId)
+        public bool RequestLease(List<string> keys, int leaseId, ref bool killMe)
         {
             List<Grpc.Core.AsyncUnaryCall<LeaseReply>> replies = new List<Grpc.Core.AsyncUnaryCall<LeaseReply>>();
             LeaseRequest request = new LeaseRequest { Id = _name, LeaseId = leaseId }; //cria request
@@ -68,7 +68,11 @@ namespace DADTKV_TM.Contact
                 }
             }
             // If true, we will never be able to reach consensus
-            if(LmAlive() <= Majority()) { return false; }
+            if(LmAlive() <= Majority()) 
+            { 
+                killMe = true;
+                return false; 
+            }
             // Sends request to all the Alive Lm's
             for (int i = 0; i < lm_stubs.Count; i++)
             {
