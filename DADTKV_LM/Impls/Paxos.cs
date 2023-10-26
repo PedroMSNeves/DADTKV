@@ -42,6 +42,7 @@ namespace DADTKV_LM.Impls
             {
                 _data.Epoch = request.Epoch;
                 int epoch = request.Epoch;
+                Console.Write("Round ID leader: " +request.RoundId);
                 Console.WriteLine("my readTs: "+ _data.GetReadTS(epoch));
 
                 if (_data.IsLeader && request.RoundId > _data.RoundID)
