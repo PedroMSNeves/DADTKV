@@ -87,7 +87,7 @@ namespace DADTKV_LM.Impls
         public void CrashedServer(string name)
         {
             _tmContact.CrashedServer(name);
-            _lmcontact.CrashedServer(name);
+            //_lmcontact.CrashedServer(name);
         }
 
         /// <summary>
@@ -146,7 +146,7 @@ namespace DADTKV_LM.Impls
 
                 for (int j = 1; j <= epoch; j++)
                 {
-                    if (_myCrashEpoch != -1 && i >= _myCrashEpoch) return; 
+                    if (_myCrashEpoch != -1 && j >= _myCrashEpoch) return; 
 
                     if (_crashed.ContainsKey(j))
                     {
