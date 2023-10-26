@@ -96,7 +96,7 @@ namespace DADTKV_LM.Contact
                         {
                             if (replies[i].ResponseAsync.IsFaulted)
                             {
-                                tm_bitmap[i] = false;
+                                //tm_bitmap[i] = false;
                             }
                             else if (replies[i].ResponseAsync.Result.Ack == true)
                             {
