@@ -168,7 +168,7 @@ namespace DADTKV_LM.Contact
             int acks = 1;
             int responses = 0;
 
-            for (int i = 0; i < lm_stubs.Count; i++)
+            for (int i = 0; i < lm_bitmap.Length; i++)
             {
                 if (lm_bitmap[i])
                 {
