@@ -23,11 +23,11 @@ namespace DADTKV_TM
 
             //Console.WriteLine("TM");
             //foreach (string s in args) Console.Write(s + " ");
-
+            
             // Minimum is name, his own url, when to crash, the LM delimiter and 1 Lm url
             if (args.Length < 7) exitOnError("Invalid number of arguments");
 
-            Uri my_url = new Uri(args[1]);;
+            Uri my_url = new Uri(args[1]);
             ServerPort serverPort = new ServerPort(my_url.Host, my_url.Port, ServerCredentials.Insecure);
 
             int crash_ts = Int32.Parse(args[2]);
@@ -92,6 +92,16 @@ namespace DADTKV_TM
                         crashed_processes[currentTimeslot].Add(args[i]);
                     }
                 }
+            }
+            Console.WriteLine("TM NAME: " + args[0] + " " + suspected_processes.Count);
+            foreach (int epoch in suspected_processes.Keys)
+            {
+                Console.Write("EPOCH: " + epoch + " My suspicions: ");
+                foreach (string name in suspected_processes[epoch])
+                {
+                    Console.Write(name + " ");
+                }
+                Console.WriteLine();
             }
 
             Console.WriteLine("TM");

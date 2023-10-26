@@ -228,7 +228,7 @@ namespace ConfigParser
                         }
                         if (!suspectedProcesses[suspectingProcess].ContainsKey(timeSlot))
                         {
-                            suspectedProcesses[suspectedProcess].Add(timeSlot, new List<string>());
+                            suspectedProcesses[suspectingProcess].Add(timeSlot, new List<string>());
                         }
                         suspectedProcesses[suspectingProcess][timeSlot].Add(suspectedProcess);
                     }
