@@ -85,7 +85,11 @@ namespace DADTKV_LM.Contact
             try
             {
                 Console.WriteLine("i: "+i);
-                if (lm_bitmap[i]) reply = lm_stubs[i].PrepareAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(5))).GetAwaiter().GetResult();
+                if (lm_bitmap[i])
+                {
+                    Console.WriteLine("A enviar msg a um gajo vivo! Fingers crossed");
+                    reply = lm_stubs[i].PrepareAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(15))).GetAwaiter().GetResult();
+                }
                 else reply = new Promise { Ack = false };
             }
             catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded || ex.StatusCode == StatusCode.Unavailable)// || ex.StatusCode == StatusCode.Unknown)
