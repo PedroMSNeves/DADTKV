@@ -179,7 +179,7 @@ namespace DADTKV_LM.Impls
                 while (!PrepareRequest(epoch))
                 {
                     //_data.RoundID = GetOtherTS(epoch) + 1;//evitamos fazer muitas vezes inuteis
-                    _data.IncrementRoundID(epoch);
+                    _data.RoundID = _data.RoundID + 10;
                 }
                 round_id = _data.RoundID;
 
