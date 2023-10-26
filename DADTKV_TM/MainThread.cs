@@ -29,7 +29,7 @@
                     for (int i = _last_epoch_read + 1; i <= epoch; i++)
                     {
                         // If we are signaled to crash, we close the servers and then end the program
-                        if (epoch == _myCrashEpoch) return;
+                        if (_myCrashEpoch != -1 && epoch >= _myCrashEpoch) return;
 
                         if (_crashedP.ContainsKey(i))
                         {
