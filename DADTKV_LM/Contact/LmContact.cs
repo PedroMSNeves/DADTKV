@@ -119,7 +119,7 @@ namespace DADTKV_LM.Contact
                 }
             }
 
-            if (AliveLMs() <= Majority()) return false;
+            //if (AliveLMs() <= Majority()) return false;
 
             
             lock (this)
@@ -132,7 +132,7 @@ namespace DADTKV_LM.Contact
                     t.Start();
                 }
                 while (!(values[0] + 1 >= (NumLMs() + 1) / 2 || values[1] >= (NumLMs() + 1) / 2)) Monitor.Wait(this);
-                if (values[0] + 1 >= (NumLMs() + 1) / 2) return true;
+                if (values[0] + 1 >= (AliveLMs() + 1) / 2) return true;
                 else return false;
             }
         }
