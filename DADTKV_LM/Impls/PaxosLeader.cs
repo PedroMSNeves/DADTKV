@@ -121,7 +121,15 @@ namespace DADTKV_LM.Impls
                                 _data.IsLeader = true;
                             }
                         }
-                   // }
+                    if (_crashed.ContainsKey(epoch))
+                    {
+                        foreach (string name in _crashed[epoch])
+                        {
+                            // If we are not signaled to crash, we look for the name that crashed
+                            CrashedServer(name);
+                        }
+                    }
+                    // }
                 }
                 possible_leader = _data.Possible_Leader;
                 if (_data.IsLeader) break;
