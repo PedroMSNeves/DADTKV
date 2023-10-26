@@ -93,6 +93,7 @@ namespace DADTKV_LM.Impls
             }
 
             bool result = _lmcontact.BroadAccepted(request);
+            Console.WriteLine("/////////////////////////////////////////// "+result);
             _data.Possible_Leader = _lmcontact.CheckPossibleLeader(_data.Possible_Leader);
             
             lock (this)
@@ -106,7 +107,7 @@ namespace DADTKV_LM.Impls
                 if (!result) reply.Ack = false;
                 else
                 {
-                    if (request.WriteTs == _data.GetReadTS(epoch)) // se isto nao acontecer e porque deu promise entretanto
+                    if (request.WriteTs >= _data.GetReadTS(epoch)) // se isto nao acontecer e porque deu promise entretanto
                     {
                         Console.WriteLine("Vou aceitar o pedido");
                         reply.Ack = true;

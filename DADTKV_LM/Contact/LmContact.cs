@@ -96,12 +96,8 @@ namespace DADTKV_LM.Contact
             {
                 reply = new Promise { Ack = false };
                 Console.WriteLine("Erro ao contactar os outros LMs");
-                lock (lm_bitmap)
-                {
-                    lm_bitmap[i] = false;
-                }
+                lm_bitmap[i] = false;
             }
-
             return reply;
         }
         public bool BroadAccepted(AcceptRequest request) //Used by the others to propagate accepted
@@ -126,13 +122,12 @@ namespace DADTKV_LM.Contact
             {
                 for (int i = 0; i < lm_bitmap.Length; i++)
                 {
-                    Console.WriteLine("Como assim: " + i);
                     int j = i;
                     Thread t = new Thread(() => { sendAccepted(ref values, j, request); });
                     t.Start();
                 }
-                while (!(values[0] + 1 >= Majority() || values[1] >= Majority())) Monitor.Wait(this);
-                if (values[0] + 1 >= Majority()) return true;
+                while (!(values[0] + 1 >= (NumLMs() + 1) / 2 || values[1] >= (NumLMs() + 1) / 2)) Monitor.Wait(this);
+                if (values[0] + 1 >= (AliveLMs() + 1) / 2) return true;
                 else return false;
             }
         }
@@ -179,10 +174,15 @@ namespace DADTKV_LM.Contact
                 {
                     replies.Add(lm_stubs[i].AcceptAsync(request));
                 }
-                else replies.Add(null);
+                else
+                {
+                    replies.Add(null);
+                    responses++;
+                }
             }
-            while (responses < lm_stubs.Count && acks <= Majority())
+            while (responses < lm_stubs.Count)
             {
+                //Monitor.Wait(st, rd.Next(100, 150));
                 for (int i = 0; i < replies.Count; i++)
                 {
                     if (replies[i] != null)
@@ -193,28 +193,16 @@ namespace DADTKV_LM.Contact
                             {
                                 lm_bitmap[i] = false;
                             }
-                            else if (replies[i].ResponseAsync.Result.Ack == true)
-                            {
-                                acks++;
-                            }
+                            else if (replies[i].ResponseAsync.Result.Ack == true) acks++;
                             responses++;
-                            replies.Remove(replies[i]);
-                            i--;
-                            if (acks > Majority()) break;
+                            replies[i] = null;
                         }
-                    }
-                    else
-                    {
-                        responses++;
-                        replies.Remove(replies[i]);
-                        i--;
                     }
                 }
             }
-
             Console.WriteLine("ACKS :" + acks);
             Console.WriteLine("OUT");
-            return acks > Majority(); //em vez do count vai ser com o bitmap dos lms que estao vivos
+            return acks > (AliveLMs() + 1) / 2; //em vez do count vai ser com o bitmap dos lms que estao vivos
         }
        
         public bool getLeaderAck(int possible_leader)

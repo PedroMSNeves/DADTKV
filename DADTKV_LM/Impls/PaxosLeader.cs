@@ -119,9 +119,7 @@ namespace DADTKV_LM.Impls
                             possible_leader++;
                             _data.IsLeader = true;
                         }
-                    }
-                    epoch = _data.Epoch;
-                    
+                    }                  
                 }
                 possible_leader = _data.Possible_Leader;
                 if (_data.IsLeader) break;
@@ -129,7 +127,7 @@ namespace DADTKV_LM.Impls
                 epoch = _data.Epoch;
                 for (int i = 1; i <= epoch; i++)
                 {
-                    if (_myCrashEpoch != -1 && epoch >= _myCrashEpoch) return;
+                    if (_myCrashEpoch != -1 && i >= _myCrashEpoch) return;
                     if (_crashed.ContainsKey(i))
                     {
                         foreach (string name in _crashed[i])
@@ -148,15 +146,13 @@ namespace DADTKV_LM.Impls
 
                 for (int j = 1; j <= epoch; j++)
                 {
-                    // If we are signaled to crash, we close the servers and then end the program
-                    if (_myCrashEpoch != -1 && epoch >= _myCrashEpoch) return; 
+                    if (_myCrashEpoch != -1 && i >= _myCrashEpoch) return; 
 
                     if (_crashed.ContainsKey(j))
                     {
                         foreach (string name in _crashed[j])
                         {
-                            // If we are not signaled to crash, we look for the name that crashed
-                            //CrashedServer(name);
+                            CrashedServer(name);
                         }
                     }
                 }
@@ -257,7 +253,7 @@ namespace DADTKV_LM.Impls
         }
         public bool AcceptRequest(int epoch, int round_id)
         {
-            Console.WriteLine("ACCEPT REQUEST");
+            Console.Write("ACCEPT REQUEST ");
             Console.WriteLine("With: "+ round_id);
             AcceptRequest request = new AcceptRequest { WriteTs = round_id, Epoch = epoch };
             LeasePaxos lp;
