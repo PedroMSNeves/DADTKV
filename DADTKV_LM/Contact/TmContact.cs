@@ -77,6 +77,7 @@ namespace DADTKV_LM.Contact
 
             for (int i = 0; i < tm_stubs.Count; i++)
             {
+                Console.WriteLine("TM "+i+ " é branco? "+ tm_bitmap[i]);
                 if (tm_bitmap[i])
                 {
                     Console.WriteLine(request.Leases.Count);
