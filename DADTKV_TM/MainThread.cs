@@ -2,15 +2,17 @@
 {
     public class MainThread
     {
-        Store _store;
-        public int _myCrashEpoch;
-        public Dictionary<int, List<string>> _crashedP;
-        int _last_epoch_read = -1;
-        public MainThread(Store st, int myCrashEpoch, Dictionary<int, List<string>> crashedP)
+        private Store _store;
+        private int _myCrashEpoch;
+        private Dictionary<int, List<string>> _crashedP;
+        private Dictionary<int, List<string>> _suspitions; // epoch-> list_of_this_tm_suspitions
+        private int _last_epoch_read = -1;
+        public MainThread(Store st, int myCrashEpoch, Dictionary<int, List<string>> crashedP, Dictionary<int, List<string>> suspitions)
         {
             _store = st;
             _myCrashEpoch = myCrashEpoch;
             _crashedP = crashedP;
+            _suspitions = suspitions;
         }
         public void cycle()
         {
@@ -37,6 +39,15 @@
                             {
                                 // If we are not signaled to crash, we look for the name that crashed
                                 _store.CrashedServer(name);
+                            }
+                        }
+
+                        // To see if we suspect someone
+                        if (_suspitions.ContainsKey(epoch))
+                        {
+                            foreach (string name in _suspitions[epoch])
+                            {
+                                _store.Suspected(name);
                             }
                         }
                     }

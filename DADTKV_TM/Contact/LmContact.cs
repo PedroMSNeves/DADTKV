@@ -50,6 +50,23 @@ namespace DADTKV_TM.Contact
             }
         }
 
+        /// <summary>
+        /// Pings 
+        /// </summary>
+        /// <param name="name"></param>
+        public bool ContactSuspect(string name, Store st)
+        {
+            for (int i = 0; i < lm_names.Count; i++)
+            {
+                if (lm_names[i] == name)
+                {
+                    //return PingSuspect(i, st);
+                }
+            }
+            // Only arrives here if the suspected name does not exist (by default we say true, it will ignore the suspicion)
+            return true;
+        }
+
         public bool RequestLease(List<string> keys, int leaseId, ref bool killMe)
         {
             List<Grpc.Core.AsyncUnaryCall<LeaseReply>> replies = new List<Grpc.Core.AsyncUnaryCall<LeaseReply>>();

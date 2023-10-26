@@ -137,7 +137,7 @@ namespace DADTKV_TM
             AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
 
             // Creates the cycle for the main thread, the thread that executes the transactions
-            MainThread mt = new MainThread(st, crash_ts, crashed_processes);
+            MainThread mt = new MainThread(st, crash_ts, crashed_processes, suspected_processes);
             mt.cycle();
         }
     }

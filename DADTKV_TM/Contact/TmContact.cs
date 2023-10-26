@@ -48,6 +48,23 @@ namespace DADTKV_TM.Contact
             }
         }
 
+        /// <summary>
+        /// Pings 
+        /// </summary>
+        /// <param name="name"></param>
+        public bool ContactSuspect(string name, Store st)
+        {
+            for (int i = 0; i < tm_names.Count; i++)
+            {
+                if (tm_names[i] == name)
+                {
+                    //return PingSuspect(i, st);
+                }
+            }
+            // Only arrives here if the suspected name does not exist (by default we say true, it will ignore the suspicion)
+            return true;
+        }
+
         public bool BroadCastChanges(string name, int leaseId, int epoch, ref bool killMe, Store st)
         {
             List<Grpc.Core.AsyncUnaryCall<BroadReply>> replies = new List<Grpc.Core.AsyncUnaryCall<BroadReply>>();

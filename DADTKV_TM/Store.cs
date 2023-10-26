@@ -97,6 +97,13 @@ namespace DADTKV_TM
             _tmContact.CrashedServer(name);
             _reqList.CrashedServer(name);
         }
+        public void Suspected(string name)
+        {
+            if (!(_tmContact.ContactSuspect(name, this) || _reqList.ContactSuspect(name, this)))
+            {
+                //if (_tmContact.KillSuspect(name, this) && _reqList.KillSuspect(name, this)) CrashedServer(name);
+            }
+        }
         //////////////////////////////////////////////USED BY SERVERSERVICE////////////////////////////////////////////////////////////
         /// <summary>
         /// Used by the ServerService class (add new client transactions)
