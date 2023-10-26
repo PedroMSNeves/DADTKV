@@ -104,17 +104,7 @@ namespace DADTKV_LM.Impls
             {
                 //Console.WriteLine("Possible Leader: " + possible_leader);
                 //Console.WriteLine("Id: " + Id);
-                epoch = _data.Epoch;
-                if (epoch == _myCrashEpoch) return;
-
-                if (_crashed.ContainsKey(epoch))
-                {
-                    foreach (string name in _crashed[epoch])
-                    {
-                        // If we are not signaled to crash, we look for the name that crashed
-                        CrashedServer(name);
-                    }
-                }
+                
                 while (Id == possible_leader + 1 && ack) //if we are the next leader
                 {
                     Thread.Sleep(5000); //dorme 5 sec e depois manda mensagem
@@ -135,11 +125,6 @@ namespace DADTKV_LM.Impls
                 }
                 possible_leader = _data.Possible_Leader;
                 if (_data.IsLeader) break;
-            }
-            for (int i = 0; i < numTimeSlots; i++)
-            {
-                Console.WriteLine("New Paxos Instance");
-                _data.Epoch++;
                 epoch = _data.Epoch;
                 if (epoch == _myCrashEpoch) return;
 
@@ -151,10 +136,27 @@ namespace DADTKV_LM.Impls
                         CrashedServer(name);
                     }
                 }
+            }
+            for (int i = 0; i < numTimeSlots; i++)
+            {
+                Console.WriteLine("New Paxos Instance");
+                _data.Epoch++;
+                epoch = _data.Epoch;
+                if (epoch == _myCrashEpoch) return;
+
                 Console.WriteLine("epoch: "+ epoch);
                 Thread t = new Thread(() => RunPaxosInstance(epoch));
                 t.Start();               
                 Thread.Sleep(timeSlotDuration);
+
+                if (_crashed.ContainsKey(epoch))
+                {
+                    foreach (string name in _crashed[epoch])
+                    {
+                        // If we are not signaled to crash, we look for the name that crashed
+                        CrashedServer(name);
+                    }
+                }
                 //t.Join();
                 _data.RoundID++;
             }
