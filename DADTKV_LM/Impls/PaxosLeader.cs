@@ -108,40 +108,50 @@ namespace DADTKV_LM.Impls
                 while (Id == possible_leader + 1 && ack) //if we are the next leader
                 {
                     Thread.Sleep(5000); //dorme 5 sec e depois manda mensagem
-                    //lock (_data)
-                    //{
-                        possible_leader = _data.Possible_Leader;
-                        if (Id == possible_leader + 1) // depois ver tambem se é o seguinte no bitmap que esteja vivo
-                        {
-                            ack = _lmcontact.getLeaderAck(_data.Possible_Leader); //Contact the leader to see if he is alive
+                    
+                    possible_leader = _data.Possible_Leader;
+                    if (Id == possible_leader + 1) // depois ver tambem se é o seguinte no bitmap que esteja vivo
+                    {
+                        ack = _lmcontact.getLeaderAck(_data.Possible_Leader); //Contact the leader to see if he is alive
 
-                            if (!ack)
+                        if (!ack)
+                        {
+                            possible_leader++;
+                            _data.IsLeader = true;
+                        }
+                    }
+                    epoch = _data.Epoch;
+                    for (int i = epoch + 1; i <= epoch; i++)
+                    {
+                        // If we are signaled to crash, we close the servers and then end the program
+                        if (epoch == _myCrashEpoch) return;
+
+                        if (_crashed.ContainsKey(i))
+                        {
+                            foreach (string name in _crashed[i])
                             {
-                                possible_leader++;
-                                _data.IsLeader = true;
+                                // If we are not signaled to crash, we look for the name that crashed
+                                CrashedServer(name);
                             }
                         }
-                    if (_crashed.ContainsKey(epoch))
+                    }
+                }
+                possible_leader = _data.Possible_Leader;
+                if (_data.IsLeader) break;
+
+                epoch = _data.Epoch;
+                for (int i = epoch + 1; i <= epoch; i++)
+                {
+                    // If we are signaled to crash, we close the servers and then end the program
+                    if (epoch == _myCrashEpoch) return;
+
+                    if (_crashed.ContainsKey(i))
                     {
-                        foreach (string name in _crashed[epoch])
+                        foreach (string name in _crashed[i])
                         {
                             // If we are not signaled to crash, we look for the name that crashed
                             CrashedServer(name);
                         }
-                    }
-                    // }
-                }
-                possible_leader = _data.Possible_Leader;
-                if (_data.IsLeader) break;
-                epoch = _data.Epoch;
-                if (epoch == _myCrashEpoch) return;
-
-                if (_crashed.ContainsKey(epoch))
-                {
-                    foreach (string name in _crashed[epoch])
-                    {
-                        // If we are not signaled to crash, we look for the name that crashed
-                        CrashedServer(name);
                     }
                 }
             }
@@ -157,12 +167,18 @@ namespace DADTKV_LM.Impls
                 t.Start();               
                 Thread.Sleep(timeSlotDuration);
 
-                if (_crashed.ContainsKey(epoch))
+                for (int j = epoch + 1; j <= epoch; j++)
                 {
-                    foreach (string name in _crashed[epoch])
+                    // If we are signaled to crash, we close the servers and then end the program
+                    if (epoch == _myCrashEpoch) return;
+
+                    if (_crashed.ContainsKey(j))
                     {
-                        // If we are not signaled to crash, we look for the name that crashed
-                        CrashedServer(name);
+                        foreach (string name in _crashed[j])
+                        {
+                            // If we are not signaled to crash, we look for the name that crashed
+                            CrashedServer(name);
+                        }
                     }
                 }
                 //t.Join();
