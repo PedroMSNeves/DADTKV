@@ -60,13 +60,72 @@ namespace DADTKV_TM.Contact
             {
                 if (lm_names[i] == name)
                 {
-                    //return PingSuspect(i, st);
+                    if (bitmap[i])
+                    {
+                        //return PingSuspect(i, st);
+                    }
                 }
             }
-            // Only arrives here if the suspected name does not exist (by default we say true, it will ignore the suspicion)
-            return true;
+            return false;
         }
+        public bool PingSuspect(int index, Store st)
+        {
+            Grpc.Core.AsyncUnaryCall<PingLm> ping = lm_stubs[index].PingSuspectAsync(new PingLm(), new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10)));
+            Random rd = new Random();
 
+            while (true)
+            {
+                Monitor.Wait(st, rd.Next(100, 150));
+                if (ping.ResponseAsync.IsCompleted)
+                {
+                    if (ping.ResponseAsync.IsCompletedSuccessfully) return true;
+                    return false;
+                }
+            }
+        }
+        public bool KillSuspect(string name, Store st)
+        {
+            List<Grpc.Core.AsyncUnaryCall<LeaseReply>> replies = new List<Grpc.Core.AsyncUnaryCall<LeaseReply>>();
+            KillRequestLm request = new KillRequestLm { TmName = name };
+            int acks = 0;
+            int responses = 0;
+            for (int i = 0; i < lm_names.Count; i++)
+            {
+
+                if (lm_names[i] != name && bitmap[i])
+                {
+                    replies.Add(lm_stubs[i].KillSuspectAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
+                }
+                else
+                {
+                    replies.Add(null);
+                    responses++;
+                }
+            }
+
+            Random rd = new Random();
+            while (responses < lm_stubs.Count)
+            {
+                Monitor.Wait(st, rd.Next(100, 150));
+                for (int i = 0; i < replies.Count; i++)
+                {
+                    if (replies[i] != null)
+                    {
+                        if (replies[i].ResponseAsync.IsCompleted)
+                        {
+                            if (replies[i].ResponseAsync.IsFaulted)
+                            {
+                                bitmap[i] = false;
+                            }
+                            else if (replies[i].ResponseAsync.Result.Ack == true) acks++;
+                            responses++;
+                            replies[i] = null;
+                        }
+                    }
+                }
+            }
+            return acks == LmAlive();
+        }
         public bool RequestLease(List<string> keys, int leaseId, ref bool killMe)
         {
             List<Grpc.Core.AsyncUnaryCall<LeaseReply>> replies = new List<Grpc.Core.AsyncUnaryCall<LeaseReply>>();

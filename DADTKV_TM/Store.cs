@@ -94,15 +94,20 @@ namespace DADTKV_TM
         }
         public void CrashedServer(string name)
         {
-            _tmContact.CrashedServer(name);
-            _reqList.CrashedServer(name);
+            lock (this)
+            {
+                _tmContact.CrashedServer(name);
+                _reqList.CrashedServer(name);
+            }
         }
         public void Suspected(string name)
         {
             if (!(_tmContact.ContactSuspect(name, this) || _reqList.ContactSuspect(name, this)))
             {
-                //if (_tmContact.KillSuspect(name, this) && _reqList.KillSuspect(name, this)) CrashedServer(name);
+                Console.WriteLine("SUSPECTED");
+                if (_tmContact.KillSuspect(name, this)/* && _reqList.KillSuspect(name, this)*/) CrashedServer(name);
             }
+            Console.WriteLine("NOTSUSPECTED");
         }
         //////////////////////////////////////////////USED BY SERVERSERVICE////////////////////////////////////////////////////////////
         /// <summary>
@@ -307,6 +312,8 @@ namespace DADTKV_TM
                 lease = verifyLease(req);
                 // If couldnt use an existing lease, requests a new one (and inserts the requests again)
                 bool killMe = false;
+                // To further impede Dead Locks
+                if (!lease) Thread.Sleep(new Random().Next(100, 500));
                 err = _reqList.Insert(req, lease, req.Transaction_number, ref killMe, this);
                 if (killMe)
                 {

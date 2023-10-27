@@ -118,5 +118,9 @@ namespace DADTKV_TM.Structs
         {
             return _lmContact.ContactSuspect(name, st);
         }
+        public bool KillSuspect(string name, Store st)
+        {
+            return _lmContact.KillSuspect(name, st);
+        }
     }
 }

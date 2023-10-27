@@ -82,5 +82,22 @@ namespace DADTKV_TM.Impls
             }
             return new BroadReply { Ack = true } ;
         }
+        public override Task<PingTm> PingSuspect(PingTm request, ServerCallContext context)
+        {
+            return Task.FromResult(PingS(request));
+        }
+        public PingTm PingS(PingTm request)
+        {
+            return new PingTm(request);
+        }
+        public override Task<BroadReply> KillSuspect(KillRequestTm request, ServerCallContext context)
+        {
+            return Task.FromResult(KillS(request));
+        }
+        public BroadReply KillS(KillRequestTm request)
+        {
+            store.CrashedServer(request.TmName);
+            return new BroadReply { Ack = true } ;
+        }
     }
 }
