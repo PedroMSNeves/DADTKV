@@ -27,6 +27,12 @@
                     if (_store.GetKillMe()) return;
                     int epoch = _store.GetEpoch();
 
+                    foreach (string name in _store.GetKillSuspected().ToList())
+                    {
+                        _store.CrashedServer(name);
+                    }
+                    _store.ClearKillSuspected();
+
                     // To see if someone crashed
                     for (int i = _last_epoch_read + 1; i <= epoch; i++)
                     {
@@ -43,9 +49,9 @@
                         }
 
                         // To see if we suspect someone
-                        if (_suspitions.ContainsKey(epoch))
+                        if (_suspitions.ContainsKey(i))
                         {
-                            foreach (string name in _suspitions[epoch])
+                            foreach (string name in _suspitions[i])
                             {
                                 _store.Suspected(name);
                             }

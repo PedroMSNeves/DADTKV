@@ -31,7 +31,17 @@ namespace DADTKV_TM.Contact
             bitmap = new bool[tm_channels.Count];
             for (int i = 0; i < bitmap.Length; i++) bitmap[i] = true;
         }
-
+        public void initStubs()
+        {
+            if (tm_stubs == null)
+            {
+                tm_stubs = new List<BroadCastService.BroadCastServiceClient>();
+                foreach (GrpcChannel channel in tm_channels)
+                {
+                    tm_stubs.Add(new BroadCastService.BroadCastServiceClient(channel));
+                }
+            }
+        }
         /// <summary>
         /// Puts the server down
         /// </summary>
@@ -70,9 +80,9 @@ namespace DADTKV_TM.Contact
 
         public bool PingSuspect(int index, Store st)
         {
+            initStubs();
             Grpc.Core.AsyncUnaryCall<PingTm> ping = tm_stubs[index].PingSuspectAsync(new PingTm(), new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10)));
             Random rd = new Random();
-
             while (true)
             {
                 Monitor.Wait(st, rd.Next(100, 150));
@@ -89,10 +99,13 @@ namespace DADTKV_TM.Contact
             KillRequestTm request = new KillRequestTm { TmName = name };
             int acks = 1;
             int responses = 0;
+
+            initStubs();
+
             for (int i = 0; i < tm_names.Count; i++)
             {
 
-                if (tm_names[i] != name && bitmap[i])
+                if (bitmap[i])
                 {
                     replies.Add(tm_stubs[i].KillSuspectAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
                 }
@@ -134,14 +147,7 @@ namespace DADTKV_TM.Contact
             int acks = 1;
             int responses = 0;
             // Initialize TM's stubs
-            if (tm_stubs == null)
-            {
-                tm_stubs = new List<BroadCastService.BroadCastServiceClient>();
-                foreach (GrpcChannel channel in tm_channels)
-                {
-                    tm_stubs.Add(new BroadCastService.BroadCastServiceClient(channel));
-                }
-            }
+            initStubs();
             // If true, we will never be able to reach majority
             if (TmAlive() <= Majority())
             {
@@ -203,14 +209,7 @@ namespace DADTKV_TM.Contact
                 residualDeletionRequest.ResidualLeases.Add(leaseProtoTm);
             }
             // Initialize TM's stubs
-            if (tm_stubs == null)
-            {
-                tm_stubs = new List<BroadCastService.BroadCastServiceClient>();
-                foreach (GrpcChannel channel in tm_channels)
-                {
-                    tm_stubs.Add(new BroadCastService.BroadCastServiceClient(channel));
-                }
-            }
+            initStubs();
             if (TmAlive() <= Majority())
             {
                 killMe = true;

@@ -98,5 +98,23 @@ namespace DADTKV_TM.Impls
             return (int)Math.Floor((decimal)((_lm_count) / 2)); // perguntar se é dos vivos ou do total
         }
 
+        public override Task<PingLm> PingSuspect(PingLm request, ServerCallContext context)
+        {
+            return Task.FromResult(PingS());
+        }
+        public PingLm PingS()
+        {
+            return new PingLm();
+        }
+        public override Task<LeaseReply> KillSuspect(KillRequestLm request, ServerCallContext context)
+        {
+            return Task.FromResult(KillS(request));
+        }
+        public LeaseReply KillS(KillRequestLm request)
+        {
+            // it is a name
+            _store.AddKillSuspected(request.TmName);
+            return new LeaseReply { Ack = true };
+        }
     }
 }

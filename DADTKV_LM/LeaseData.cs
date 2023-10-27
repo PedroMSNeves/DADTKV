@@ -14,6 +14,8 @@ namespace DADTKV_LM
         private Dictionary<int, int> write_ts;
         private bool _killMe = false;
         private int _epochFinished = 0;
+        private List<string> _killSuspected;
+
         public LeaseData(bool leader)
         {
             Possible_Leader = 0;
@@ -22,6 +24,7 @@ namespace DADTKV_LM
             write_ts = new Dictionary<int, int>();
             RoundID = 0;
             Epoch = 0;
+            _killSuspected = new List<string>();
         }
         public int Epoch { get; set; }
         public int GetReadTS(int epoch) 
@@ -82,6 +85,21 @@ namespace DADTKV_LM
                 _requests.Clear();
                 return myValue;
             }
+        }
+        public void AddKillSuspected(string name)
+        {
+            lock (this)
+            {
+                _killSuspected.Add(name);
+            }
+        }
+        public List<string> GetKillSuspected()
+        {
+            return _killSuspected;
+        }
+        public void ClearKillSuspected()
+        {
+            _killSuspected.Clear();
         }
     }
 }

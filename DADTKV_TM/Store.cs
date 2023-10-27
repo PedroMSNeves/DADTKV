@@ -20,6 +20,7 @@ namespace DADTKV_TM
         private int tries;
         private int _triesBeforeDropingRequest;
         private bool _KillMe = false;
+        private List<string> _killSuspected;
         public Store(string name, int timeSlotDuration, List<string> tm_urls, List<string> lm_urls, List<string> tm_names, List<string> lm_names)
         {
             tries = timeSlotDuration / 25;
@@ -30,6 +31,7 @@ namespace DADTKV_TM
             _tmContact = new TmContact(tm_urls, tm_names);
             _fullLeases = new List<FullLease>();
             _waitList = new Dictionary<int, List<FullLease>>();
+            _killSuspected = new List<string>();
         }
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         public int GetEpoch() { return _epoch; }
@@ -100,12 +102,30 @@ namespace DADTKV_TM
                 _reqList.CrashedServer(name);
             }
         }
+        public void AddKillSuspected(string name)
+        {
+            lock (this)
+            {
+                _killSuspected.Add(name);
+            }
+        }
+        public List<string> GetKillSuspected()
+        {
+            return _killSuspected;
+        }
+        public void ClearKillSuspected()
+        {
+            _killSuspected.Clear();
+        }
         public void Suspected(string name)
         {
-            if (!(_tmContact.ContactSuspect(name, this) || _reqList.ContactSuspect(name, this)))
+            Console.WriteLine("ProcessOF");
+            if (!(_tmContact.ContactSuspect(name, this)  || _reqList.ContactSuspect(name, this)))
             {
+                CrashedServer(name);
                 Console.WriteLine("SUSPECTED");
-                if (_tmContact.KillSuspect(name, this)/* && _reqList.KillSuspect(name, this)*/) CrashedServer(name);
+                _tmContact.KillSuspect(name, this);
+                _reqList.KillSuspect(name, this);
             }
             Console.WriteLine("NOTSUSPECTED");
         }
