@@ -9,7 +9,7 @@ namespace DADTKV_TM.Structs
     public class WaitLeases
     {
 
-        public WaitLeases(int epoch, List<FullLease> leases) 
+        public WaitLeases(int epoch, List<FullLease> leases)
         {
             Epoch = epoch;
             Acks = 1; // 1 ack always

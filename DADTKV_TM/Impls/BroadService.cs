@@ -20,6 +20,8 @@ namespace DADTKV_TM.Impls
         }
         public BroadReply BCast(BroadRequest request)
         {
+            // Verification to deny response to dead Tms
+            foreach (string name in store.GetDeadNamesTm()) if (name == request.TmName) throw new RpcException(new Status(StatusCode.Aborted, "You are dead"));
             // Sees if it can write the request
             return new BroadReply { Ack = store.TestWrite(request.TmName, request.LeaseId, request.Epoch) };
         }
@@ -43,6 +45,8 @@ namespace DADTKV_TM.Impls
         }
         public ResidualReply RDeletion(ResidualDeletionRequest request)
         {
+            // Verification to deny response to dead Tms
+            foreach (string name in store.GetDeadNamesTm()) if (name == request.ResidualLeases[0].Tm) throw new RpcException(new Status(StatusCode.Aborted, "You are dead"));
             ResidualReply reply = new ResidualReply();
             Console.WriteLine("REceived new residualDeletion");
 
@@ -57,7 +61,7 @@ namespace DADTKV_TM.Impls
             return reply;
         }
 
-        public override Task<BroadReply> ConfirmResidualDeletion (ConfirmResidualDeletionRequest request, ServerCallContext context)
+        public override Task<BroadReply> ConfirmResidualDeletion(ConfirmResidualDeletionRequest request, ServerCallContext context)
         {
             return Task.FromResult(Conf(request));
         }
@@ -76,7 +80,24 @@ namespace DADTKV_TM.Impls
                 }
                 waitListresidual[request.TmName].Clear();
             }
-            return new BroadReply { Ack = true } ;
+            return new BroadReply { Ack = true };
+        }
+        public override Task<PingTm> PingSuspect(PingTm request, ServerCallContext context)
+        {
+            return Task.FromResult(PingS(request));
+        }
+        public PingTm PingS(PingTm request)
+        {
+            return new PingTm(request);
+        }
+        public override Task<BroadReply> KillSuspect(KillRequestTm request, ServerCallContext context)
+        {
+            return Task.FromResult(KillS(request));
+        }
+        public BroadReply KillS(KillRequestTm request)
+        {
+            store.CrashedServer(request.TmName);
+            return new BroadReply { Ack = true };
         }
     }
 }

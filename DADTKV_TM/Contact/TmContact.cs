@@ -48,6 +48,85 @@ namespace DADTKV_TM.Contact
             }
         }
 
+        /// <summary>
+        /// Pings 
+        /// </summary>
+        /// <param name="name"></param>
+        public bool ContactSuspect(string name, Store st)
+        {
+            for (int i = 0; i < tm_names.Count; i++)
+            {
+                if (tm_names[i] == name)
+                {
+                    if (bitmap[i])
+                    {
+                        return PingSuspect(i, st);
+                    }
+                    else return false;
+                }
+            }
+            return false;
+        }
+
+        public bool PingSuspect(int index, Store st)
+        {
+            Grpc.Core.AsyncUnaryCall<PingTm> ping = tm_stubs[index].PingSuspectAsync(new PingTm(), new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10)));
+            Random rd = new Random();
+
+            while (true)
+            {
+                Monitor.Wait(st, rd.Next(100, 150));
+                if (ping.ResponseAsync.IsCompleted)
+                {
+                    if (ping.ResponseAsync.IsCompletedSuccessfully) return true;
+                    return false;
+                }
+            }
+        }
+        public bool KillSuspect(string name, Store st)
+        {
+            List<Grpc.Core.AsyncUnaryCall<BroadReply>> replies = new List<Grpc.Core.AsyncUnaryCall<BroadReply>>();
+            KillRequestTm request = new KillRequestTm { TmName = name };
+            int acks = 1;
+            int responses = 0;
+            for (int i = 0; i < tm_names.Count; i++)
+            {
+
+                if (tm_names[i] != name && bitmap[i])
+                {
+                    replies.Add(tm_stubs[i].KillSuspectAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
+                }
+                else
+                {
+                    replies.Add(null);
+                    responses++;
+                }
+            }
+
+            Random rd = new Random();
+            while (responses < tm_stubs.Count)
+            {
+                Monitor.Wait(st, rd.Next(100, 150));
+                for (int i = 0; i < replies.Count; i++)
+                {
+                    if (replies[i] != null)
+                    {
+                        if (replies[i].ResponseAsync.IsCompleted)
+                        {
+                            if (replies[i].ResponseAsync.IsFaulted)
+                            {
+                                bitmap[i] = false;
+                            }
+                            else if (replies[i].ResponseAsync.Result.Ack == true) acks++;
+                            responses++;
+                            replies[i] = null;
+                        }
+                    }
+                }
+            }
+            return acks == TmAlive();
+        }
+
         public bool BroadCastChanges(string name, int leaseId, int epoch, ref bool killMe, Store st)
         {
             List<Grpc.Core.AsyncUnaryCall<BroadReply>> replies = new List<Grpc.Core.AsyncUnaryCall<BroadReply>>();
@@ -77,8 +156,8 @@ namespace DADTKV_TM.Contact
                     replies.Add(tm_stubs[i].BroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
                 }
                 else
-                { 
-                    replies.Add(null); 
+                {
+                    replies.Add(null);
                     responses++;
                 }
             }
@@ -94,6 +173,7 @@ namespace DADTKV_TM.Contact
                         {
                             if (replies[i].ResponseAsync.IsFaulted)
                             {
+                                Console.WriteLine(replies[i].ResponseAsync.Exception.ToString());
                                 bitmap[i] = false;
                             }
                             else if (replies[i].ResponseAsync.Result.Ack == true) acks++;
@@ -108,7 +188,7 @@ namespace DADTKV_TM.Contact
 
             return acks == TmAlive();
         }
-        public bool[] DeleteResidualKeys(List<FullLease> residualLeases, int epoch, ref bool killMe, Store st) 
+        public bool[] DeleteResidualKeys(List<FullLease> residualLeases, int epoch, ref bool killMe, Store st)
         {
             List<Grpc.Core.AsyncUnaryCall<ResidualReply>> replies = new List<Grpc.Core.AsyncUnaryCall<ResidualReply>>();
             ResidualDeletionRequest residualDeletionRequest = new ResidualDeletionRequest { Epoch = epoch };
@@ -116,7 +196,7 @@ namespace DADTKV_TM.Contact
             int[] acks = new int[residualLeases.Count];
             for (int i = 0; i < acks.Length; i++) acks[i] = 0;
             // Prepare the request
-            foreach (FullLease lease in residualLeases) 
+            foreach (FullLease lease in residualLeases)
             {
                 LeaseProtoTm leaseProtoTm = new LeaseProtoTm { LeaseId = lease.Lease_number, Tm = lease.Tm_name };
                 leaseProtoTm.Keys.AddRange(lease.Keys);
@@ -182,13 +262,13 @@ namespace DADTKV_TM.Contact
             for (int i = 0; i < acks.Length; i++)
             {
                 Console.Write(acks[i] + " ");
-                if (acks[i]+1 == alive) bools[i] = true;
+                if (acks[i] + 1 == alive) bools[i] = true;
                 else bools[i] = false;
                 Console.Write(bools[i] + " ");
             }
             Console.WriteLine();
             Console.WriteLine("ACKS");
-            
+
             return bools;
         }
         public void ConfirmBroadChanges(List<DadIntProto> writes, bool ack)
@@ -233,7 +313,7 @@ namespace DADTKV_TM.Contact
         /// <returns></returns>
         private int Majority()
         {
-            return (int)Math.Floor((decimal)((tm_stubs.Count+1) / 2)); // perguntar se é dos vivos ou do total
+            return (int)Math.Floor((decimal)((tm_stubs.Count + 1) / 2)); // perguntar se é dos vivos ou do total
         }
         private int TmAlive()
         {

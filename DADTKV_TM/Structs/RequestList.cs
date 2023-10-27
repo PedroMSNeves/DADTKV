@@ -17,7 +17,7 @@ namespace DADTKV_TM.Structs
         public RequestList(int size, string name, List<string> lm_urls, List<string> lm_names)
         {
             result = new Dictionary<int, ResultOfTransaction>();
-            buffer = new List<Request>() ;
+            buffer = new List<Request>();
             MAX = size;
             _lmContact = new LmContact(name, lm_urls, lm_names);
         }
@@ -65,9 +65,9 @@ namespace DADTKV_TM.Structs
         }
         public void Remove(int i, Store st)
         {
-                buffer.RemoveAt(i);
-                buzy--;
-                Monitor.PulseAll(st);
+            buffer.RemoveAt(i);
+            buzy--;
+            Monitor.PulseAll(st);
         }
         public void Remove(List<Request> reqs, Store st)
         {
@@ -75,14 +75,14 @@ namespace DADTKV_TM.Structs
             {
                 for (int i = 0; i < buffer.Count; i++)
                 {
-                    if (buffer[i].Transaction_number == request.Transaction_number) 
-                    { 
-                        Remove(i,st);
+                    if (buffer[i].Transaction_number == request.Transaction_number)
+                    {
+                        Remove(i, st);
                         break;
                     }
                 }
             }
-            
+
         }
         public void Move(int transaction_number, List<DadIntProto> resultT, int err)
         {
@@ -109,6 +109,18 @@ namespace DADTKV_TM.Structs
         public void CrashedServer(string name)
         {
             _lmContact.CrashedServer(name);
+        }
+        public List<string> GetDeadNames()
+        {
+            return _lmContact.GetDeadNames();
+        }
+        public bool ContactSuspect(string name, Store st)
+        {
+            return _lmContact.ContactSuspect(name, st);
+        }
+        public bool KillSuspect(string name, Store st)
+        {
+            return _lmContact.KillSuspect(name, st);
         }
     }
 }

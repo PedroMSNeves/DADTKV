@@ -44,13 +44,88 @@ namespace DADTKV_TM.Contact
             {
                 if (lm_names[i] == name)
                 {
-                    Console.WriteLine(name + " " + "TestApagar");
                     bitmap[i] = false;
                     break;
                 }
             }
         }
 
+        /// <summary>
+        /// Pings 
+        /// </summary>
+        /// <param name="name"></param>
+        public bool ContactSuspect(string name, Store st)
+        {
+            for (int i = 0; i < lm_names.Count; i++)
+            {
+                if (lm_names[i] == name)
+                {
+                    if (bitmap[i])
+                    {
+                        //return PingSuspect(i, st);
+                    }
+                }
+            }
+            return false;
+        }
+        public bool PingSuspect(int index, Store st)
+        {
+            Grpc.Core.AsyncUnaryCall<PingLm> ping = lm_stubs[index].PingSuspectAsync(new PingLm(), new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10)));
+            Random rd = new Random();
+
+            while (true)
+            {
+                Monitor.Wait(st, rd.Next(100, 150));
+                if (ping.ResponseAsync.IsCompleted)
+                {
+                    if (ping.ResponseAsync.IsCompletedSuccessfully) return true;
+                    return false;
+                }
+            }
+        }
+        public bool KillSuspect(string name, Store st)
+        {
+            List<Grpc.Core.AsyncUnaryCall<LeaseReply>> replies = new List<Grpc.Core.AsyncUnaryCall<LeaseReply>>();
+            KillRequestLm request = new KillRequestLm { TmName = name };
+            int acks = 0;
+            int responses = 0;
+            for (int i = 0; i < lm_names.Count; i++)
+            {
+
+                if (lm_names[i] != name && bitmap[i])
+                {
+                    replies.Add(lm_stubs[i].KillSuspectAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
+                }
+                else
+                {
+                    replies.Add(null);
+                    responses++;
+                }
+            }
+
+            Random rd = new Random();
+            while (responses < lm_stubs.Count)
+            {
+                Monitor.Wait(st, rd.Next(100, 150));
+                for (int i = 0; i < replies.Count; i++)
+                {
+                    if (replies[i] != null)
+                    {
+                        if (replies[i].ResponseAsync.IsCompleted)
+                        {
+                            if (replies[i].ResponseAsync.IsFaulted)
+                            {
+                                bitmap[i] = false;
+                            }
+                            else if (replies[i].ResponseAsync.Result.Ack == true) acks++;
+                            responses++;
+                            replies[i] = null;
+                        }
+                    }
+                }
+            }
+            return acks == LmAlive();
+        }
         public bool RequestLease(List<string> keys, int leaseId, ref bool killMe)
         {
             List<Grpc.Core.AsyncUnaryCall<LeaseReply>> replies = new List<Grpc.Core.AsyncUnaryCall<LeaseReply>>();
@@ -63,16 +138,16 @@ namespace DADTKV_TM.Contact
             if (lm_stubs == null)
             {
                 lm_stubs = new List<LeaseService.LeaseServiceClient>();
-                foreach(GrpcChannel channel in lm_channels)
+                foreach (GrpcChannel channel in lm_channels)
                 {
                     lm_stubs.Add(new LeaseService.LeaseServiceClient(channel));
                 }
             }
             // If true, we will never be able to reach consensus
-            if(LmAlive() <= Majority()) 
-            { 
+            if (LmAlive() <= Majority())
+            {
                 killMe = true;
-                return false; 
+                return false;
             }
             // Sends request to all the Alive Lm's
             for (int i = 0; i < lm_stubs.Count; i++)
@@ -81,8 +156,8 @@ namespace DADTKV_TM.Contact
                 {
                     replies.Add(lm_stubs[i].LeaseAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
                 }
-                else 
-                { 
+                else
+                {
                     replies.Add(null);
                     responses++;
                 }
@@ -107,7 +182,7 @@ namespace DADTKV_TM.Contact
                             responses++;
                             replies[i] = null;
                         }
-                    } 
+                    }
                 }
             }
 
@@ -118,14 +193,26 @@ namespace DADTKV_TM.Contact
         }
 
         private int Majority()
-        {            
-            return (int) Math.Floor((decimal)((lm_stubs.Count)/2)); // perguntar se é dos vivos ou do total
+        {
+            return (int)Math.Floor((decimal)((lm_stubs.Count) / 2)); // perguntar se é dos vivos ou do total
         }
         private int LmAlive()
         {
             int count = 0;
             foreach (bool b in bitmap) if (b) count++;
             return count;
+        }
+        public List<string> GetDeadNames()
+        {
+            List<string> names = new List<string>();
+            for (int i = 0; i < lm_names.Count; i++)
+            {
+                if (!bitmap[i])
+                {
+                    names.Add(lm_names[i]);
+                }
+            }
+            return names;
         }
     }
 }
