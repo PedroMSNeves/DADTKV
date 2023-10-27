@@ -5,7 +5,7 @@
     /// </summary>
     public class FullLease
     {
-        public FullLease(string tm_name, int epoch,List<string> keys, int lease_number)
+        public FullLease(string tm_name, int epoch, List<string> keys, int lease_number)
         {
             Keys = keys;
             Tm_name = tm_name;
@@ -21,7 +21,7 @@
 
         public bool Intersection(FullLease other)
         {
-            foreach (string key in Keys) 
+            foreach (string key in Keys)
             {
                 if (other.Contains(key)) return true;
             }
@@ -37,7 +37,7 @@
         }
         public bool Intersection(List<FullLease> others)
         {
-            foreach(FullLease other in others)
+            foreach (FullLease other in others)
             {
                 if (Intersection(other)) return true;
             }
@@ -46,12 +46,12 @@
         public bool Contains(string key)
         { return Keys.Contains(key); }
 
-        public bool Equal (FullLease other)
+        public bool Equal(FullLease other)
         {
             if (Tm_name != other.Tm_name) return false;
             if (Epoch != other.Epoch) return false;
-            if(Lease_number  != other.Lease_number) return false;
-            if(Keys.Count != other.Keys.Count) return false;
+            if (Lease_number != other.Lease_number) return false;
+            if (Keys.Count != other.Keys.Count) return false;
             for (int i = 0; i < Keys.Count; i++)
             {
                 if (!Keys[i].Equals(other.Keys[i])) return false;

@@ -21,7 +21,7 @@ namespace DADTKV_TM.Impls
         public BroadReply BCast(BroadRequest request)
         {
             // Verification to deny response to dead Tms
-            foreach (string name in store.GetDeadNamesTm()) if(name == request.TmName) throw new RpcException(new Status(StatusCode.Aborted, "You are dead"));
+            foreach (string name in store.GetDeadNamesTm()) if (name == request.TmName) throw new RpcException(new Status(StatusCode.Aborted, "You are dead"));
             // Sees if it can write the request
             return new BroadReply { Ack = store.TestWrite(request.TmName, request.LeaseId, request.Epoch) };
         }
@@ -61,7 +61,7 @@ namespace DADTKV_TM.Impls
             return reply;
         }
 
-        public override Task<BroadReply> ConfirmResidualDeletion (ConfirmResidualDeletionRequest request, ServerCallContext context)
+        public override Task<BroadReply> ConfirmResidualDeletion(ConfirmResidualDeletionRequest request, ServerCallContext context)
         {
             return Task.FromResult(Conf(request));
         }
@@ -80,7 +80,7 @@ namespace DADTKV_TM.Impls
                 }
                 waitListresidual[request.TmName].Clear();
             }
-            return new BroadReply { Ack = true } ;
+            return new BroadReply { Ack = true };
         }
         public override Task<PingTm> PingSuspect(PingTm request, ServerCallContext context)
         {
@@ -97,7 +97,7 @@ namespace DADTKV_TM.Impls
         public BroadReply KillS(KillRequestTm request)
         {
             store.CrashedServer(request.TmName);
-            return new BroadReply { Ack = true } ;
+            return new BroadReply { Ack = true };
         }
     }
 }

@@ -138,16 +138,16 @@ namespace DADTKV_TM.Contact
             if (lm_stubs == null)
             {
                 lm_stubs = new List<LeaseService.LeaseServiceClient>();
-                foreach(GrpcChannel channel in lm_channels)
+                foreach (GrpcChannel channel in lm_channels)
                 {
                     lm_stubs.Add(new LeaseService.LeaseServiceClient(channel));
                 }
             }
             // If true, we will never be able to reach consensus
-            if(LmAlive() <= Majority()) 
-            { 
+            if (LmAlive() <= Majority())
+            {
                 killMe = true;
-                return false; 
+                return false;
             }
             // Sends request to all the Alive Lm's
             for (int i = 0; i < lm_stubs.Count; i++)
@@ -156,8 +156,8 @@ namespace DADTKV_TM.Contact
                 {
                     replies.Add(lm_stubs[i].LeaseAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
                 }
-                else 
-                { 
+                else
+                {
                     replies.Add(null);
                     responses++;
                 }
@@ -182,7 +182,7 @@ namespace DADTKV_TM.Contact
                             responses++;
                             replies[i] = null;
                         }
-                    } 
+                    }
                 }
             }
 
@@ -193,8 +193,8 @@ namespace DADTKV_TM.Contact
         }
 
         private int Majority()
-        {            
-            return (int) Math.Floor((decimal)((lm_stubs.Count)/2)); // perguntar se é dos vivos ou do total
+        {
+            return (int)Math.Floor((decimal)((lm_stubs.Count) / 2)); // perguntar se é dos vivos ou do total
         }
         private int LmAlive()
         {

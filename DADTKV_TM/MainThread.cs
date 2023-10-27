@@ -21,7 +21,7 @@
             {
                 _store.Execute();
                 _store.RemoveResidual();
-                Thread.Sleep(rd.Next(100,500));
+                Thread.Sleep(rd.Next(100, 500));
                 lock (_store)
                 {
                     if (_store.GetKillMe()) return;

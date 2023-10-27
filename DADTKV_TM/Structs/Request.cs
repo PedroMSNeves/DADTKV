@@ -14,10 +14,10 @@
         public List<string> Reads { get; }
         public List<DadIntProto> Writes { get; }
         public int Transaction_number { set; get; }
-        public int Lease_number { set;  get; }
+        public int Lease_number { set; get; }
         public List<string> Keys { get; }
 
-        public void Initialize (int transaction_number)
+        public void Initialize(int transaction_number)
         {
             Transaction_number = transaction_number;
         }
