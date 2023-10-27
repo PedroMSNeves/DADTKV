@@ -27,7 +27,7 @@ namespace DADTKV_LM.Impls
         public LeaseReply Ls(LeaseRequest request)
         {
             Console.WriteLine("NEW REQUEST: " + request.ToString());
-            if (_tmContact.Alive(request.Id)) return new LeaseReply { Ack = false };
+            //if (_tmContact.Alive(request.Id)) return new LeaseReply { Ack = false };
 
             _data.AddRequest(new Request(request.Id, request.Keys.ToList(), request.LeaseId));
             return new LeaseReply { Ack = true };

@@ -26,6 +26,7 @@ namespace DADTKV_LM.Contact
                     Console.WriteLine("ERROR: Invalid Tm server url");
                 }
             }
+            _name = name;
             tm_names = t_names;
             tm_bitmap = new bool[tm_channels.Count];
             for (int i = 0; i < tm_bitmap.Length; i++) tm_bitmap[i] = true;
