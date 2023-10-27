@@ -102,7 +102,10 @@ namespace DADTKV_LM.Contact
         }
         public bool BroadAccepted(AcceptRequest request) //Used by the others to propagate accepted
         {
+            List<Grpc.Core.AsyncUnaryCall<AcceptReply>> replies = new List<Grpc.Core.AsyncUnaryCall<AcceptReply>>();
             List<int> values = new List<int>();
+            int responses = 0;
+            int acks = 1;
             values.Add(0);//ack counter
             values.Add(0);//nack counter
 
@@ -116,50 +119,46 @@ namespace DADTKV_LM.Contact
             }
 
             //if (AliveLMs() <= Majority()) return false;
-
-            
             lock (this)
             {
-                for (int i = 0; i < lm_bitmap.Length; i++)
+                for (int i = 0; i < lm_names.Count; i++)
                 {
-                    int j = i;
-                    Thread t = new Thread(() => { sendAccepted(ref values, j, request); });
-                    t.Start();
-                }
-                while (!(values[0] + 1 >= (NumLMs() + 1) / 2 || values[1] >= (NumLMs() + 1) / 2)) Monitor.Wait(this);
-                if (values[0] + 1 >= (AliveLMs() + 1) / 2) return true;
-                else return false;
-            }
-        }
-        private void sendAccepted(ref List<int> values, int i, AcceptRequest request)
-        {
-            Console.WriteLine("NEW THREAD TO SEND ACCEPTED TO OTHERS");
-            try
-            {
-                if (lm_bitmap[i])
-                {
-                    AcceptReply reply = lm_stubs[i].AcceptedAsync(request).GetAwaiter().GetResult();
-                    lock (this)
-                    {
-                        if (reply.Ack) values[0]++;
-                        else values[1]++;
-                        Monitor.Pulse(this);
-                    }
 
-                    Console.WriteLine("ACCEPTED SENDED YES: " + values[0]);
-                    Console.WriteLine("ACCEPTED SENDED NO: " + values[1]);
+                    if (lm_bitmap[i])
+                    {
+                        replies.Add(lm_stubs[i].AcceptedAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
+                    }
+                    else
+                    {
+                        replies.Add(null);
+                        responses++;
+                    }
                 }
-                else 
+
+                Random rd = new Random();
+                while (responses < lm_stubs.Count)
                 {
-                    Console.WriteLine("I think the LM: "+ i + " is dead!");
-                    values[1]++;
+                    Monitor.Wait(this, rd.Next(100, 150));
+                    for (int i = 0; i < replies.Count; i++)
+                    {
+                        if (replies[i] != null)
+                        {
+                            if (replies[i].ResponseAsync.IsCompleted)
+                            {
+                                if (replies[i].ResponseAsync.IsFaulted)
+                                {
+                                    lm_bitmap[i] = false;
+                                }
+                                else if (replies[i].ResponseAsync.Result.Ack == true) acks++;
+                                responses++;
+                                replies[i] = null;
+                                if (acks > Majority()) return true;
+                            }
+                        }
+                    }
                 }
             }
-            catch (RpcException ex) when (ex.StatusCode == StatusCode.Unavailable || ex.StatusCode == StatusCode.DeadlineExceeded)
-            {
-                lm_bitmap[i] = false;
-                values[1]++;
-            }
+            return acks > Majority();
         }
         public bool AcceptRequest(AcceptRequest request) //Used by the leaders to propagate accept 
         {

@@ -34,7 +34,7 @@ namespace DADTKV_TM.Structs
         {
             int tnumber;
             while (buzy == MAX) Monitor.Wait(st);
-            tnumber = tNum;
+            tnumber = transaction_number++;
             if (!lease)
             {
                 // Use of distinct because we only need one copy of each key

@@ -117,6 +117,8 @@ namespace DADTKV_LM.Impls
                             My_value.Add(new Request(l.Tm, l.Keys.ToList(), l.LeaseId));
                         }
                         _data.Possible_Leader = request.LeaderId;
+                        _data.SetEpochFinished(request.Epoch);
+
                         //Sends the Paxos result to all TMs
                         bool killMe = false;
                         _tmContact.BroadLease(epoch, My_value, ref killMe);

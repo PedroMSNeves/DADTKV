@@ -118,6 +118,7 @@ namespace DADTKV_LM.Impls
                         {
                             possible_leader++;
                             _data.IsLeader = true;
+                            _data.Epoch = _data.GetEpochFinished();
                         }
                     }                  
                 }

@@ -196,6 +196,7 @@ namespace DADTKV_TM
                     if (fulllease.Intersection(req)) return -1;
                 }
             }
+            if (fulllease.Lease_number == rq.Lease_number) return -1;
             return fulllease.Lease_number;
         }
         /// <summary>
@@ -240,6 +241,7 @@ namespace DADTKV_TM
                     if (requestLease.Intersection(req)) return -1;
                 }
             }
+            if (leaseNr == rq.Lease_number) return -1;
             return leaseNr;
         }
         /// <summary>
@@ -631,6 +633,7 @@ namespace DADTKV_TM
                     used = false;
                 }
                 Console.WriteLine("REMOVE RESIDUAL1");
+                Console.WriteLine("epoch:" + _epoch);
                 if (leases.Count == 0) return;
                 Console.WriteLine("APAGAR LEASES RESIDUAIS: ");
                 //foreach (string key in leases) Console.WriteLine(key + " ");
