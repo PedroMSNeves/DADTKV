@@ -23,7 +23,7 @@ namespace DADTKV_TM
 
             //Console.WriteLine("TM");
             //foreach (string s in args) Console.Write(s + " ");
-            
+
             // Minimum is name, his own url, when to crash, the LM delimiter and 1 Lm url
             if (args.Length < 7) exitOnError("Invalid number of arguments");
 
@@ -40,7 +40,7 @@ namespace DADTKV_TM
             {
                 if (args[i].Equals("LM"))
                 {
-                    lm = true;                   
+                    lm = true;
                 }
                 else if (args[i].Equals("SP"))
                 {
@@ -63,7 +63,8 @@ namespace DADTKV_TM
                     lm_urls.Add(args[i], args[i + 1]);
                     i++;
                 }
-                else if (sp && !cp) {
+                else if (sp && !cp)
+                {
                     if (args[i].All(char.IsDigit))
                     {
                         currentTimeslot = int.Parse(args[i]);
@@ -122,7 +123,7 @@ namespace DADTKV_TM
             if (!lm && !sp && !cp) exitOnError("No LeaseManagers provided");
 
             // Store is shared by the various services
-            Store st = new Store(args[0], int.Parse(args[3]) ,tm_urls.Values.ToList(), lm_urls.Values.ToList(), tm_urls.Keys.ToList(), lm_urls.Keys.ToList());
+            Store st = new Store(args[0], int.Parse(args[3]), tm_urls.Values.ToList(), lm_urls.Values.ToList(), tm_urls.Keys.ToList(), lm_urls.Keys.ToList());
             Server server = new Server
             {
                 Services = { TmService.BindService(new ServerService(st, args[0])),

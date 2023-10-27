@@ -24,7 +24,7 @@ namespace DADTKV_TM
         {
             tries = timeSlotDuration / 25;
             ResetTimes();
-            _reqList = new RequestList(10,name, lm_urls, lm_names); // Maximum of requests waiting allowed and information necessary to ask for new leases
+            _reqList = new RequestList(10, name, lm_urls, lm_names); // Maximum of requests waiting allowed and information necessary to ask for new leases
             _name = name;
             _store = new Dictionary<string, int>();
             _tmContact = new TmContact(tm_urls, tm_names);
@@ -121,7 +121,7 @@ namespace DADTKV_TM
             int tnum;
             Request req;
             Console.WriteLine("VerifyAndInsertRequest");
-            lock (this) 
+            lock (this)
             {
                 // Creates Request
                 req = new Request(reads, writes);
@@ -133,9 +133,9 @@ namespace DADTKV_TM
                 // Inserts the request into the queue, if no lease could be used, asks for a new one
                 Console.WriteLine("Insert");
                 bool kill = false;
-                tnum = _reqList.Insert(req,lease, ref kill,this);
-                if (kill) 
-                { 
+                tnum = _reqList.Insert(req, lease, ref kill, this);
+                if (kill)
+                {
                     _KillMe = true;
                     return -1;
                 }
@@ -214,10 +214,10 @@ namespace DADTKV_TM
             foreach (Request req in reqs)
             {
                 // Sees if we can use the lease
-                if (rq.SubGroup(req)) 
-                { 
+                if (rq.SubGroup(req))
+                {
                     // If we find a newer lease that we are a subgroup we store it
-                    if(leaseNr != req.Lease_number)
+                    if (leaseNr != req.Lease_number)
                     {
                         leaseNr = req.Lease_number;
                         requestLease = req;
@@ -279,7 +279,7 @@ namespace DADTKV_TM
         {
             // Finds the Lease needed
             fl = GetFullLease(req.Lease_number, _name);
-            if (fl == null) return false; 
+            if (fl == null) return false;
             // Tries to find intersections, if any is found, then is not our time to execute yet
             return FullLeaseIntersection(fl);
         }
@@ -297,7 +297,7 @@ namespace DADTKV_TM
                 if (rq.Lease_number == req.Lease_number)
                 {
                     rqs.Add(rq);
-                    Console.WriteLine(rq.Transaction_number+" "+rq.Lease_number);
+                    Console.WriteLine(rq.Transaction_number + " " + rq.Lease_number);
                 }
             }
             // Drops all the requests
@@ -326,7 +326,7 @@ namespace DADTKV_TM
                     _reqList.Move(req.Transaction_number, reply, err);
                 }
             }
-            
+
             Console.WriteLine("REREQUEST LEASE END " + req.Lease_number);
         }
         /// <summary>
@@ -336,7 +336,7 @@ namespace DADTKV_TM
         {
             lock (this)
             {
-                Request req; 
+                Request req;
                 while (true)
                 {
                     // Gets first request
@@ -351,12 +351,12 @@ namespace DADTKV_TM
                     {
                         Console.WriteLine("TRIES BEFORE DROPING" + _triesBeforeDropingRequest);
                         DecreaseRelease();
-                        if(_triesBeforeDropingRequest == 0)
+                        if (_triesBeforeDropingRequest == 0)
                         {
                             Rerequest(req);
                             return;
                         }
-                        Console.WriteLine("NO LEASE: WE need " + _name + " "+req.Lease_number);
+                        Console.WriteLine("NO LEASE: WE need " + _name + " " + req.Lease_number);
                         foreach (FullLease ff in _fullLeases.ToList())
                         {
                             Console.Write("FL: " + ff.Tm_name + " " + ff.Lease_number + " " + ff.End + " KEYS: ");
@@ -372,7 +372,7 @@ namespace DADTKV_TM
                     // Moves it to the pickup waiting place
                     _reqList.Move(req.Transaction_number, reply, err);
                     // Remove from the request list
-                    _reqList.Remove(0,this);
+                    _reqList.Remove(0, this);
                 }
             }
         }
@@ -387,7 +387,7 @@ namespace DADTKV_TM
         public int Request(List<string> reads, List<DadIntProto> writes, FullLease fl, ref List<DadIntProto> reply)
         {
             // If we have writes we try to propagate them
-            if(writes.Count != 0)
+            if (writes.Count != 0)
             {
                 bool killMe = false;
                 bool ack = _tmContact.BroadCastChanges(_name, fl.Lease_number, fl.Epoch, ref killMe, this);
@@ -397,12 +397,12 @@ namespace DADTKV_TM
                     return -2;
                 }
                 _tmContact.ConfirmBroadChanges(writes, ack);
-                if(!ack) return -2;
+                if (!ack) return -2;
             }
             // Prepare the reply to the client (and execute writes)
             foreach (string key in reads)
-            { 
-                if(!_store.ContainsKey(key)) reply.Add(new DadIntProto { Key = key, Value = 0, InvalidRead = true }); // Does the reads
+            {
+                if (!_store.ContainsKey(key)) reply.Add(new DadIntProto { Key = key, Value = 0, InvalidRead = true }); // Does the reads
                 else reply.Add(new DadIntProto { Key = key, Value = _store[key], InvalidRead = false }); // Does the reads
 
             }
@@ -561,7 +561,7 @@ namespace DADTKV_TM
             Console.WriteLine("NewLeases");
             foreach (FullLease fl in leases)
             {
-                foreach(string key in fl.Keys)
+                foreach (string key in fl.Keys)
                 {
                     foreach (FullLease fulllease in _fullLeases)
                     {
@@ -590,7 +590,7 @@ namespace DADTKV_TM
                 Console.WriteLine("Requests");
                 foreach (Request rq in _reqList.GetRequestsNow())
                 {
-                    Console.WriteLine(rq.Transaction_number +" "  + rq.Lease_number );
+                    Console.WriteLine(rq.Transaction_number + " " + rq.Lease_number);
                 }
                 // Dead tms, remove leases
                 List<string> dead = GetDeadNamesTm();
@@ -611,11 +611,11 @@ namespace DADTKV_TM
                 List<FullLease> leases = new List<FullLease>();
                 foreach (FullLease fullLease in _fullLeases.ToList())
                 {
-                    if(fullLease.Tm_name == _name && fullLease.End)
+                    if (fullLease.Tm_name == _name && fullLease.End)
                     {
                         foreach (Request rq in _reqList.GetRequestsNow())
                         {
-                            if (fullLease.Lease_number == rq.Lease_number )
+                            if (fullLease.Lease_number == rq.Lease_number)
                             {
                                 //if (fullLease.Epoch > maxEpoch) maxEpoch = fullLease.Epoch;
                                 used = true;
@@ -634,7 +634,7 @@ namespace DADTKV_TM
                 if (leases.Count == 0) return;
                 Console.WriteLine("APAGAR LEASES RESIDUAIS: ");
                 //foreach (string key in leases) Console.WriteLine(key + " ");
-                foreach(FullLease lease in leases)
+                foreach (FullLease lease in leases)
                 {
                     Console.WriteLine("FL: " + lease.Tm_name + " " + lease.End + " " + lease.Lease_number);
                 }

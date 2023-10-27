@@ -156,8 +156,8 @@ namespace DADTKV_TM.Contact
                     replies.Add(tm_stubs[i].BroadCastAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
                 }
                 else
-                { 
-                    replies.Add(null); 
+                {
+                    replies.Add(null);
                     responses++;
                 }
             }
@@ -188,7 +188,7 @@ namespace DADTKV_TM.Contact
 
             return acks == TmAlive();
         }
-        public bool[] DeleteResidualKeys(List<FullLease> residualLeases, int epoch, ref bool killMe, Store st) 
+        public bool[] DeleteResidualKeys(List<FullLease> residualLeases, int epoch, ref bool killMe, Store st)
         {
             List<Grpc.Core.AsyncUnaryCall<ResidualReply>> replies = new List<Grpc.Core.AsyncUnaryCall<ResidualReply>>();
             ResidualDeletionRequest residualDeletionRequest = new ResidualDeletionRequest { Epoch = epoch };
@@ -196,7 +196,7 @@ namespace DADTKV_TM.Contact
             int[] acks = new int[residualLeases.Count];
             for (int i = 0; i < acks.Length; i++) acks[i] = 0;
             // Prepare the request
-            foreach (FullLease lease in residualLeases) 
+            foreach (FullLease lease in residualLeases)
             {
                 LeaseProtoTm leaseProtoTm = new LeaseProtoTm { LeaseId = lease.Lease_number, Tm = lease.Tm_name };
                 leaseProtoTm.Keys.AddRange(lease.Keys);
@@ -262,13 +262,13 @@ namespace DADTKV_TM.Contact
             for (int i = 0; i < acks.Length; i++)
             {
                 Console.Write(acks[i] + " ");
-                if (acks[i]+1 == alive) bools[i] = true;
+                if (acks[i] + 1 == alive) bools[i] = true;
                 else bools[i] = false;
                 Console.Write(bools[i] + " ");
             }
             Console.WriteLine();
             Console.WriteLine("ACKS");
-            
+
             return bools;
         }
         public void ConfirmBroadChanges(List<DadIntProto> writes, bool ack)
@@ -313,7 +313,7 @@ namespace DADTKV_TM.Contact
         /// <returns></returns>
         private int Majority()
         {
-            return (int)Math.Floor((decimal)((tm_stubs.Count+1) / 2)); // perguntar se é dos vivos ou do total
+            return (int)Math.Floor((decimal)((tm_stubs.Count + 1) / 2)); // perguntar se é dos vivos ou do total
         }
         private int TmAlive()
         {
