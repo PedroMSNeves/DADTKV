@@ -37,6 +37,10 @@ namespace DADTKV_TM.Impls
             List<FullLease> leases = new List<FullLease>();
             bool ready = false;
             bool exists = false;
+
+            // Verification to deny response to dead Lms
+            foreach (string name in _store.GetDeadNamesLm()) if (name == request.LmName) throw new RpcException(new Status(StatusCode.Aborted, "You are dead"));
+
             lock (waitLeases)
             {
                 Console.WriteLine("EPOCH: " + request.Epoch);
@@ -53,7 +57,7 @@ namespace DADTKV_TM.Impls
                 {
                     if (wl.Epoch == request.Epoch)
                     {
-                        if (Equal(wl.Leases,leases))
+                        if (Equal(wl.Leases, leases))
                         {
                             exists = true;
                             wl.IncreaseAcks();
@@ -68,7 +72,7 @@ namespace DADTKV_TM.Impls
                     if (_lm_count == 1) _store.WaitLeases(leases, request.Epoch);
                     else waitLeases.Add(new WaitLeases(request.Epoch, leases));
                 }
-                Console.WriteLine(exists + " " +  ready);
+                Console.WriteLine(exists + " " + ready);
                 // Passes to the store if already has majority
                 if (ready)
                 {
@@ -81,7 +85,7 @@ namespace DADTKV_TM.Impls
         }
         public bool Equal(List<FullLease> others1, List<FullLease> others2)
         {
-            if( others1.Count != others2.Count) return false;
+            if (others1.Count != others2.Count) return false;
             for (int i = 0; i < others1.Count; i++)
             {
 

@@ -18,9 +18,17 @@ message LeaseReply {
 message LeaseBroadCastRequest {
 	int32 epoch = 1;
 	repeated LeaseProto leases = 2;
+	string lmName = 3;
+}
+message PingLm {}
+
+message KillRequestLm {
+	string tm_name = 1;
 }
 
 service LeaseService {
 	rpc Lease (LeaseRequest) returns (LeaseReply);
 	rpc LeaseBroadCast (LeaseBroadCastRequest) returns (LeaseReply);
+	rpc PingSuspect (PingLm) returns (PingLm);
+	rpc KillSuspect (KillRequestLm) returns (LeaseReply);
 }

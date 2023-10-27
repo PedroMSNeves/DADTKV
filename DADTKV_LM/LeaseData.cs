@@ -12,7 +12,8 @@ namespace DADTKV_LM
         List<Request> _requests = new List<Request>(); //requests received from TMs
         private Dictionary<int, int> read_ts;
         private Dictionary<int, int> write_ts;
-
+        private bool _killMe = false;
+        private int _epochFinished = 0;
         public LeaseData(bool leader)
         {
             Possible_Leader = 0;
@@ -49,26 +50,15 @@ namespace DADTKV_LM
                 _requests.Add(request);                
             }
         }
-        public void AddRequestBeginning(Request request) //nao ness
+        public int GetEpochFinished() { return _epochFinished; }
+        public void SetEpochFinished(int epoch) { _epochFinished = epoch; }
+
+        public void KillMe()
         {
-            lock (this)
-            {
-                _requests.Insert(0, request);
-            }
+            _killMe = true;
         }
-        public bool RemoveRequest() //removes from beginning //nao ness
-        {
-            lock (this)
-            {
-                if (_requests.Count == 0) return false;
-                _requests.RemoveAt(0);
-                return true;
-            }
-        }
-        public bool Intersect(List<string> l1, List<string> l2)
-        {
-            return l1.Intersect(l2).Any();
-        }
+        public bool GetKillMe() { return _killMe; }
+
         public List<Request> GetMyValue()
         {
             lock (this)

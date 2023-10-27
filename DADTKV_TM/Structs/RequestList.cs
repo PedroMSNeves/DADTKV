@@ -14,12 +14,12 @@ namespace DADTKV_TM.Structs
         private int buzy = 0;
         private int transaction_number = 1;
         private LmContact _lmContact;
-        public RequestList(int size, string name, List<string> lm_urls)
+        public RequestList(int size, string name, List<string> lm_urls, List<string> lm_names)
         {
             result = new Dictionary<int, ResultOfTransaction>();
-            buffer = new List<Request>() ;
+            buffer = new List<Request>();
             MAX = size;
-            _lmContact = new LmContact(name, lm_urls);
+            _lmContact = new LmContact(name, lm_urls, lm_names);
         }
         public List<Request> GetRequestsNow()
         {
@@ -30,15 +30,15 @@ namespace DADTKV_TM.Structs
             if (buffer.Count == 0) return null;
             return buffer[0];
         }
-        public int Insert(Request req, bool lease, int tNum, Store st)
+        public int Insert(Request req, bool lease, int tNum, ref bool killMe, Store st)
         {
             int tnumber;
             while (buzy == MAX) Monitor.Wait(st);
-            tnumber = tNum;
+            tnumber = transaction_number++;
             if (!lease)
             {
                 // Use of distinct because we only need one copy of each key
-                if (!_lmContact.RequestLease(req.Keys.Distinct().ToList(), tnumber)) return -1;
+                if (!_lmContact.RequestLease(req.Keys.Distinct().ToList(), tnumber, ref killMe)) return -1;
                 req.Lease_number = tnumber;
             }
             buffer.Add(req);
@@ -46,7 +46,7 @@ namespace DADTKV_TM.Structs
             Monitor.PulseAll(st);
             return tnumber;
         }
-        public int Insert(Request req, bool lease, Store st)
+        public int Insert(Request req, bool lease, ref bool killMe, Store st)
         {
             int tnumber;
             while (buzy == MAX) Monitor.Wait(st);
@@ -55,7 +55,7 @@ namespace DADTKV_TM.Structs
             if (!lease)
             {
                 // Use of distinct because we only need one copy of each key
-                if (!_lmContact.RequestLease(req.Keys.Distinct().ToList(), tnumber)) return -1;
+                if (!_lmContact.RequestLease(req.Keys.Distinct().ToList(), tnumber, ref killMe)) return -1;
                 req.Lease_number = tnumber;
             }
             buffer.Add(req);
@@ -65,9 +65,9 @@ namespace DADTKV_TM.Structs
         }
         public void Remove(int i, Store st)
         {
-                buffer.RemoveAt(i);
-                buzy--;
-                Monitor.PulseAll(st);
+            buffer.RemoveAt(i);
+            buzy--;
+            Monitor.PulseAll(st);
         }
         public void Remove(List<Request> reqs, Store st)
         {
@@ -75,14 +75,14 @@ namespace DADTKV_TM.Structs
             {
                 for (int i = 0; i < buffer.Count; i++)
                 {
-                    if (buffer[i].Transaction_number == request.Transaction_number) 
-                    { 
-                        Remove(i,st);
+                    if (buffer[i].Transaction_number == request.Transaction_number)
+                    {
+                        Remove(i, st);
                         break;
                     }
                 }
             }
-            
+
         }
         public void Move(int transaction_number, List<DadIntProto> resultT, int err)
         {
@@ -105,6 +105,22 @@ namespace DADTKV_TM.Structs
                 result.Remove(t_number);
             }
             return resultT;
+        }
+        public void CrashedServer(string name)
+        {
+            _lmContact.CrashedServer(name);
+        }
+        public List<string> GetDeadNames()
+        {
+            return _lmContact.GetDeadNames();
+        }
+        public bool ContactSuspect(string name, Store st)
+        {
+            return _lmContact.ContactSuspect(name, st);
+        }
+        public bool KillSuspect(string name, Store st)
+        {
+            return _lmContact.KillSuspect(name, st);
         }
     }
 }

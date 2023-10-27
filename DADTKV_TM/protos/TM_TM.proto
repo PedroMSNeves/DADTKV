@@ -38,11 +38,18 @@ message ConfirmBroadChangesRequest {
 	repeated DadIntTmProto writes = 1;
 	bool ack = 2;
 }
+message PingTm {}
+
+message KillRequestTm {
+	string tm_name = 1;
+}
 
 service BroadCastService {
   rpc BroadCast (BroadRequest) returns (BroadReply);
   rpc ResidualDeletion (ResidualDeletionRequest) returns (ResidualReply);
   rpc ConfirmResidualDeletion (ConfirmResidualDeletionRequest) returns (BroadReply);
   rpc ConfirmBroadChanges (ConfirmBroadChangesRequest) returns (BroadReply);
+  rpc PingSuspect (PingTm) returns (PingTm);
+  rpc KillSuspect (KillRequestTm) returns (BroadReply);
 
 }

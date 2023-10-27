@@ -12,14 +12,14 @@ namespace DADTKV_LM.Impls
         LmContact _lmcontact;
         TmContact _tmContact;
 
-        public Paxos(string name, LeaseData data, List<string> tm_urls, List<string> lm_urls)
+        public Paxos(string name, LeaseData data, TmContact tmContact, LmContact lmContact)
         {
             Name = name;
             _data = data;
             //When paxos is called needs to select the requests that don´t conflict to define our value
             My_value = _data.GetMyValue(); //quando é que fazemos isto?
-            _tmContact = new TmContact(tm_urls);
-            _lmcontact = new LmContact(name, lm_urls);
+            _tmContact = tmContact;
+            _lmcontact = lmContact;
         }
         public string Name { get; }
         public List<Request> My_value { set; get; }
@@ -35,6 +35,7 @@ namespace DADTKV_LM.Impls
         public Promise Prep(PrepareRequest request) 
         {
             Promise reply;
+            Console.WriteLine("RECEBI PREPARE");
             Console.WriteLine("leader_id: "+request.LeaderId);
             Console.WriteLine("epoch: "+request.Epoch);
 
@@ -42,6 +43,8 @@ namespace DADTKV_LM.Impls
             {
                 _data.Epoch = request.Epoch;
                 int epoch = request.Epoch;
+                Console.Write("Round ID leader: " +request.RoundId);
+                Console.WriteLine(" ;my readTs: "+ _data.GetReadTS(epoch));
 
                 if (_data.IsLeader && request.RoundId > _data.RoundID)
                 {
@@ -90,6 +93,7 @@ namespace DADTKV_LM.Impls
             }
 
             bool result = _lmcontact.BroadAccepted(request);
+            Console.WriteLine("/////////////////////////////////////////// "+result);
             _data.Possible_Leader = _lmcontact.CheckPossibleLeader(_data.Possible_Leader);
             
             lock (this)
@@ -103,8 +107,9 @@ namespace DADTKV_LM.Impls
                 if (!result) reply.Ack = false;
                 else
                 {
-                    if (request.WriteTs == _data.GetReadTS(epoch)) // se isto nao acontecer e porque deu promise entretanto
+                    if (request.WriteTs >= _data.GetReadTS(epoch)) // se isto nao acontecer e porque deu promise entretanto
                     {
+                        Console.WriteLine("Vou aceitar o pedido");
                         reply.Ack = true;
                         My_value.Clear();
                         foreach (LeasePaxos l in request.Leases)
@@ -112,8 +117,12 @@ namespace DADTKV_LM.Impls
                             My_value.Add(new Request(l.Tm, l.Keys.ToList(), l.LeaseId));
                         }
                         _data.Possible_Leader = request.LeaderId;
+                        _data.SetEpochFinished(request.Epoch);
+
                         //Sends the Paxos result to all TMs
-                        _tmContact.BroadLease(epoch, My_value);
+                        bool killMe = false;
+                        _tmContact.BroadLease(epoch, My_value, ref killMe);
+                        if (killMe) _data.KillMe();
                     }
                     else reply.Ack = false;
                 }

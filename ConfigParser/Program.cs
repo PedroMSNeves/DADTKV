@@ -8,7 +8,6 @@ namespace ConfigParser
         {
             Process process = new Process();
             process.StartInfo.FileName = "cmd.exe";
-
             string solutionDir = Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory)?.Parent?.Parent?.Parent?.Parent?.FullName ?? "";
             process.StartInfo.Arguments = $"/c " + solutionDir + @"\" + project + @"\bin\Debug\net6.0\" + $"{project}.exe {arguments}";
             process.StartInfo.UseShellExecute = true;
@@ -30,47 +29,91 @@ namespace ConfigParser
             client.Start();
         }
 
-        public static void launchTransactionManager(string id, string url, int timeSlotDuration, List<string> transactionManagers, List<string> leaseManagers)
+        public static void launchTransactionManager(string id, string url, int crash_ts, int timeSlotDuration, Dictionary<string, string> transactionManagers, Dictionary<string, string> leaseManagers, Dictionary<int, List<string>> suspectedProcesses, Dictionary<int, List<string>> crashedProcesses)
         {
-            string args = "";
+            string args = $"{id} {url} {crash_ts} {timeSlotDuration} ";
             // Pass all Transaction Manager URLs to the Transaction Manager
-            foreach (string transactionManager in transactionManagers)
+            foreach (KeyValuePair<string, string> transactionManager in transactionManagers)
             {
-                if (transactionManager != url) args += $" {transactionManager}";
+                if (transactionManager.Key != id) args += $" {transactionManager.Key} {transactionManager.Value}";
             }
 
             args += " LM";
 
             // Pass all Lease Manager URLs to the Transaction Manager
-            foreach (string leaseManager in leaseManagers)
+            foreach (KeyValuePair<string, string> leaseManager in leaseManagers)
             {
-                args += $" {leaseManager}";
+                args += $" {leaseManager.Key} {leaseManager.Value}";
+            }
+
+            // Pass all suspected processes to the Transaction Manager
+            args += " SP";
+            foreach (KeyValuePair<int, List<string>> suspectedProcessesPair in suspectedProcesses)
+            {
+                args += $" {suspectedProcessesPair.Key}";
+                foreach (string suspectedProcess in suspectedProcessesPair.Value)
+                {
+                    args += $" {suspectedProcess}";
+                }
+            }
+
+            // Pass all crashed processes to the Transaction Manager
+            args += " CP";
+            foreach (KeyValuePair<int, List<string>> crashedProcessesPair in crashedProcesses)
+            {
+                args += $" {crashedProcessesPair.Key}";
+                foreach (string crashedProcess in crashedProcessesPair.Value)
+                {
+                    args += $" {crashedProcess}";
+                }
             }
 
             Console.WriteLine($"Launching Transaction Manager {id} with args: {args}");
-            Process server = createProcess("DADTKV_TM", $"{id} {url} {timeSlotDuration} {args}");
+            Process server = createProcess("DADTKV_TM", $"{args}");
             server.Start();
         }
 
-        public static void launchLeaseManager(string id, int paxos_id, string url, int numTimeSlots, string startingTime, int timeSlotDuration, List<string> transactionManagers, List<string> leaseManagers)
+        public static void launchLeaseManager(string id, int paxos_id, string url, int numTimeSlots, string startingTime, int timeSlotDuration, int crash_ts, Dictionary<string, string> transactionManagers, Dictionary<string, string> leaseManagers, Dictionary<int, List<string>> suspectedProcesses, Dictionary<int, List<string>> crashedProcesses)
         {
-            string args = $"{paxos_id} {numTimeSlots} {startingTime} {timeSlotDuration}";
+            string args = $"{id} {url} {paxos_id} {numTimeSlots} {startingTime} {timeSlotDuration} {crash_ts}";
             // Pass all Lease Manager URLs to the Lease Manager
-            foreach (string leaseManager in leaseManagers)
+            foreach (KeyValuePair<string, string> leaseManager in leaseManagers)
             {
-                if (leaseManager != url) args += $" {leaseManager}";
+                if (leaseManager.Key != id) args += $" {leaseManager.Key} {leaseManager.Value}";
             }
 
             args += " TM";
 
             // Pass all Transaction Manager URLs to the Lease Manager
-            foreach (string transactionManager in transactionManagers)
+            foreach (KeyValuePair<string, string> transactionManager in transactionManagers)
             {
-                args += $" {transactionManager}";
+                args += $" {transactionManager.Key} {transactionManager.Value}";
+            }
+
+            // Pass all suspected processes to the Lease Manager
+            args += " SP";
+            foreach (KeyValuePair<int, List<string>> suspectedProcessesPair in suspectedProcesses)
+            {
+                args += $" {suspectedProcessesPair.Key}";
+                foreach (string suspectedProcess in suspectedProcessesPair.Value)
+                {
+                    args += $" {suspectedProcess}";
+                }
+            }
+
+            // Pass all crashed processes to the Lease Manager
+            args += " CP";
+            foreach (KeyValuePair<int, List<string>> crashedProcessesPair in crashedProcesses)
+            {
+                args += $" {crashedProcessesPair.Key}";
+                foreach (string crashedProcess in crashedProcessesPair.Value)
+                {
+                    args += $" {crashedProcess}";
+                }
             }
 
             Console.WriteLine($"Launching Lease Manager {id} with args: {args}");
-            Process server = createProcess("DADTKV_LM", $"{id} {url} {args}");
+            Process server = createProcess("DADTKV_LM", $"{args}");
             server.Start();
         }
         public static void Main(string[] args)
@@ -78,6 +121,12 @@ namespace ConfigParser
             int numTimeSlots = 0;
             string startingTime = "00:00:00";
             int timeSlotDuration = 0;
+
+            int count = 0;
+            Dictionary<int, string> serverProcesses = new Dictionary<int, string>();
+            Dictionary<string, int> serverCrashTimeslots = new Dictionary<string, int>();
+            Dictionary<string, Dictionary<int, List<string>>> suspectedProcesses = new Dictionary<string, Dictionary<int, List<string>>>();
+            Dictionary<int, List<string>> crashedProcesses = new Dictionary<int, List<string>>();
 
             // Save server IDs and URLs to pass onto the clients
             Dictionary<string, string> transactionManagers = new Dictionary<string, string>();
@@ -107,6 +156,7 @@ namespace ConfigParser
                     {
                         string url = words[3];
                         transactionManagers.Add(id, url);
+                        serverProcesses.Add(count++, id);
                     }
 
                     // Lease Manager
@@ -114,6 +164,7 @@ namespace ConfigParser
                     {
                         string url = words[3];
                         leaseManagers.Add(id, url);
+                        serverProcesses.Add(count++, id);
                     }
 
                     // Client
@@ -146,23 +197,59 @@ namespace ConfigParser
                 else if (words[0] == "F")
                 {
                     int timeSlot = Int32.Parse(words[1]);
-                    // TODO
+
+                    for (int i = 2; i < 2 + serverProcesses.Count; i++)
+                    {
+                        if (words[i] == "N")
+                        {
+                            // Do nothing
+                        }
+                        else if (words[i] == "C")
+                        {
+                            string serverId = serverProcesses[i - 2];
+                            serverCrashTimeslots.Add(serverId, timeSlot);
+
+                            if (!crashedProcesses.ContainsKey(timeSlot))
+                            {
+                                crashedProcesses.Add(timeSlot, new List<string>());
+                            }
+                            crashedProcesses[timeSlot].Add(serverId);
+                        }
+                    }
+
+                    for (int i = 2 + serverProcesses.Count; i < words.Length; i++)
+                    {
+                        string[] suspectedProcessesPair = words[i].Split(',');
+                        string suspectingProcess = suspectedProcessesPair[0].Substring(1);
+                        string suspectedProcess = suspectedProcessesPair[1].Substring(0, suspectedProcessesPair[1].Length - 1);
+                        if (!suspectedProcesses.ContainsKey(suspectingProcess))
+                        {
+                            suspectedProcesses.Add(suspectingProcess, new Dictionary<int, List<string>>());
+                        }
+                        if (!suspectedProcesses[suspectingProcess].ContainsKey(timeSlot))
+                        {
+                            suspectedProcesses[suspectingProcess].Add(timeSlot, new List<string>());
+                        }
+                        suspectedProcesses[suspectingProcess][timeSlot].Add(suspectedProcess);
+                    }
                 }
             }
 
-
+            // Launch all servers
             int paxos_id = 0;
             foreach (KeyValuePair<string, string> leaseManager in leaseManagers)
             {
-                launchLeaseManager(leaseManager.Key, paxos_id++, leaseManager.Value, numTimeSlots, startingTime, timeSlotDuration, transactionManagers.Values.ToList(), leaseManagers.Values.ToList());
+                int crash_ts = serverCrashTimeslots.ContainsKey(leaseManager.Key) ? serverCrashTimeslots[leaseManager.Key] : -1;
+                Dictionary<int, List<string>> suspectedProcessesForLM = suspectedProcesses.ContainsKey(leaseManager.Key) ? suspectedProcesses[leaseManager.Key] : new Dictionary<int, List<string>>();
+                launchLeaseManager(leaseManager.Key, paxos_id++, leaseManager.Value, numTimeSlots, startingTime, timeSlotDuration, crash_ts, transactionManagers, leaseManagers, suspectedProcessesForLM, crashedProcesses);
             }
-            // Launch all servers
+
             foreach (KeyValuePair<string, string> transactionManager in transactionManagers)
             {
-                launchTransactionManager(transactionManager.Key, transactionManager.Value, timeSlotDuration, transactionManagers.Values.ToList(), leaseManagers.Values.ToList());
+                int crash_ts = serverCrashTimeslots.ContainsKey(transactionManager.Key) ? serverCrashTimeslots[transactionManager.Key] : -1;
+                Dictionary<int, List<string>> suspectedProcessesForTM = suspectedProcesses.ContainsKey(transactionManager.Key) ? suspectedProcesses[transactionManager.Key] : new Dictionary<int, List<string>>();
+                launchTransactionManager(transactionManager.Key, transactionManager.Value, crash_ts, timeSlotDuration, transactionManagers, leaseManagers, suspectedProcessesForTM, crashedProcesses);
             }
-
-
 
             // Launch all clients
             foreach (KeyValuePair<string, string> client in clients)
