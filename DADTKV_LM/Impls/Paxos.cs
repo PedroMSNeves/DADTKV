@@ -175,6 +175,23 @@ namespace DADTKV_LM.Impls
             }
             return reply;
         }
-
+        public override Task<PingLmLm> PingSuspect(PingLmLm request, ServerCallContext context)
+        {
+            return Task.FromResult(PingS());
+        }
+        public PingLmLm PingS()
+        {
+            return new PingLmLm();
+        }
+        public override Task<PingLmLm> KillSuspect(KillRequestLmLm request, ServerCallContext context)
+        {
+            return Task.FromResult(KillS(request));
+        }
+        public PingLmLm KillS(KillRequestLmLm request)
+        {
+            // it is a name
+            _data.AddKillSuspected(request.TmName);
+            return new PingLmLm();
+        }
     }
 }

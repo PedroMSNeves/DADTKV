@@ -129,7 +129,7 @@ namespace DADTKV_LM
             int numTimeSlots = Int32.Parse(args[3]);
             int timeSlotDuration = Int32.Parse(args[5]);
 
-            PaxosLeader pl = new PaxosLeader(args[0], dt, id, crash_ts, tmContact, lmContact, crashed_processes);
+            PaxosLeader pl = new PaxosLeader(args[0], dt, id, crash_ts, tmContact, lmContact, crashed_processes, suspected_processes);
 
             Console.WriteLine("Insecure server listening on port " + my_url.Port);
             //Configuring HTTP for client connections in Register method

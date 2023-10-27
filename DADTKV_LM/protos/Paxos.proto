@@ -31,10 +31,16 @@ message AcceptReply {
 message AckRequest {
 	int32 epoch = 1;
 }
+message PingLmLm {}
 
+message KillRequestLmLm {
+	string tm_name = 1;
+}
 service PaxosService {
 	rpc Prepare (PrepareRequest) returns (Promise);
 	rpc Accept (AcceptRequest) returns (AcceptReply);
 	rpc Accepted (AcceptRequest) returns (AcceptReply);
 	rpc GetLeaderAck (AckRequest) returns (AcceptReply);
+	rpc PingSuspect (PingLmLm) returns (PingLmLm);
+	rpc KillSuspect (KillRequestLmLm) returns (PingLmLm);
 }

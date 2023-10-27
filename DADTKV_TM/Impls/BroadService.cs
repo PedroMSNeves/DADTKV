@@ -84,11 +84,11 @@ namespace DADTKV_TM.Impls
         }
         public override Task<PingTm> PingSuspect(PingTm request, ServerCallContext context)
         {
-            return Task.FromResult(PingS(request));
+            return Task.FromResult(PingS());
         }
-        public PingTm PingS(PingTm request)
+        public PingTm PingS()
         {
-            return new PingTm(request);
+            return new PingTm();
         }
         public override Task<BroadReply> KillSuspect(KillRequestTm request, ServerCallContext context)
         {

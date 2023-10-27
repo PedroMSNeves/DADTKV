@@ -1,4 +1,5 @@
-﻿using DADTKV_LM.Structs;
+﻿using DADTKV_LM.Impls;
+using DADTKV_LM.Structs;
 using Grpc.Core;
 using Grpc.Net.Client;
 
@@ -69,7 +70,102 @@ namespace DADTKV_LM.Contact
         }
         public int NumLMs() { return lm_channels.Count; }
         public int TotalNumLMs() { return lm_channels.Count; }
+        /// <summary>
+        /// Pings 
+        /// </summary>
+        /// <param name="name"></param>
+        public bool ContactSuspect(string name, PaxosLeader pl)
+        {
+            for (int i = 0; i < lm_names.Count; i++)
+            {
+                if (lm_names[i] == name)
+                {
+                    if (lm_bitmap[i])
+                    {
+                        return PingSuspect(i, pl);
+                    }
+                }
+            }
+            Console.WriteLine("XLS");
+            return false;
+        }
+        public bool PingSuspect(int index, PaxosLeader st)
+        {
+            Console.WriteLine("XTP");
 
+            if (lm_stubs == null)
+            {
+                lm_stubs = new List<PaxosService.PaxosServiceClient>();
+                foreach (GrpcChannel channel in lm_channels)
+                {
+                    lm_stubs.Add(new PaxosService.PaxosServiceClient(channel));
+                }
+            }
+            Grpc.Core.AsyncUnaryCall<PingLmLm> ping = lm_stubs[index].PingSuspectAsync(new PingLmLm(), new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10)));
+            Random rd = new Random();
+            while (true)
+            {
+                Monitor.Wait(st, rd.Next(100, 150));
+                if (ping.ResponseAsync.IsCompleted)
+                {
+                    if (ping.ResponseAsync.IsCompletedSuccessfully) return true;
+                    return false;
+                }
+            }
+        }
+        public bool KillSuspect(string name, PaxosLeader st)
+        {
+            List<Grpc.Core.AsyncUnaryCall<PingLmLm>> replies = new List<Grpc.Core.AsyncUnaryCall<PingLmLm>>();
+            KillRequestLmLm request = new KillRequestLmLm { TmName = name };
+            int acks = 1;
+            int responses = 0;
+
+            if (lm_stubs == null)
+            {
+                lm_stubs = new List<PaxosService.PaxosServiceClient>();
+                foreach (GrpcChannel channel in lm_channels)
+                {
+                    lm_stubs.Add(new PaxosService.PaxosServiceClient(channel));
+                }
+            }
+
+            for (int i = 0; i < lm_names.Count; i++)
+            {
+
+                if (lm_bitmap[i])
+                {
+                    replies.Add(lm_stubs[i].KillSuspectAsync(request, new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10))));
+                }
+                else
+                {
+                    replies.Add(null);
+                    responses++;
+                }
+            }
+
+            Random rd = new Random();
+            while (responses < lm_stubs.Count)
+            {
+                Monitor.Wait(st, rd.Next(100, 150));
+                for (int i = 0; i < replies.Count; i++)
+                {
+                    if (replies[i] != null)
+                    {
+                        if (replies[i].ResponseAsync.IsCompleted)
+                        {
+                            if (replies[i].ResponseAsync.IsFaulted)
+                            {
+                                lm_bitmap[i] = false;
+                            }
+                            else if (replies[i].ResponseAsync.IsCompletedSuccessfully) acks++;
+                            responses++;
+                            replies[i] = null;
+                        }
+                    }
+                }
+            }
+            return acks == AliveLMs();
+        }
         public Promise PrepareRequest(PrepareRequest request, int i)
         {
             Promise reply;
