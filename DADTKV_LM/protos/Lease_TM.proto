@@ -18,6 +18,7 @@ message LeaseReply {
 message LeaseBroadCastRequest {
 	int32 epoch = 1;
 	repeated LeaseProto leases = 2;
+	string lmName = 3;
 }
 
 service LeaseService {

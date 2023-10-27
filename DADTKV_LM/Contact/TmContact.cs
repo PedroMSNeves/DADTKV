@@ -11,8 +11,9 @@ namespace DADTKV_LM.Contact
         List<LeaseService.LeaseServiceClient> tm_stubs = null;
         List<GrpcChannel> tm_channels = new List<GrpcChannel>();
         bool[] tm_bitmap;
+        private string _name;
 
-        public TmContact(List<string> tm_urls, List<string> t_names)
+        public TmContact(string name, List<string> tm_urls, List<string> t_names)
         {
             foreach (string url in tm_urls)
             {
@@ -57,7 +58,7 @@ namespace DADTKV_LM.Contact
         public bool BroadLease(int epoch, List<Request> leases)
         {
             List<Grpc.Core.AsyncUnaryCall<LeaseReply>> replies = new List<Grpc.Core.AsyncUnaryCall<LeaseReply>>();
-            LeaseBroadCastRequest request = new LeaseBroadCastRequest { Epoch = epoch };
+            LeaseBroadCastRequest request = new LeaseBroadCastRequest { Epoch = epoch, LmName = _name };
 
             int acks = 0;
             int responses = 0;

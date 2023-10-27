@@ -12,12 +12,12 @@ namespace DADTKV_LM.Impls
         private LeaseData _data;
         LmContact _lmcontact;
         TmContact _tmContact;
-        public LeageManager(string name, LeaseData data, List<string> tm_urls, List<string> lm_urls, List<string> tm_names, List<string> lm_names)
+        public LeageManager(string name, LeaseData data, TmContact tmContact, LmContact lmContact)
         {
             _name = name;
             _data = data;
-            _tmContact = new TmContact(tm_urls, tm_names);
-            _lmcontact = new LmContact(name, lm_urls, lm_names);
+            _tmContact = tmContact;
+            _lmcontact = lmContact;
         }
 
         public override Task<LeaseReply> Lease(LeaseRequest request, ServerCallContext context)

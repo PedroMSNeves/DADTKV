@@ -18,15 +18,15 @@ namespace DADTKV_LM.Impls
         public Dictionary<int, List<string>> _crashed;
         int _myCrashEpoch;
 
-        public PaxosLeader(string name, LeaseData data, int id, int crash_ts, List<string> tm_urls, List<string> lm_urls, List<string> tm_names, List<string> lm_names, Dictionary<int, List<string>> crashedP)
+        public PaxosLeader(string name, LeaseData data, int id, int crash_ts, TmContact tmContact, LmContact lmContact, Dictionary<int, List<string>> crashedP)
         {
             _name = name;
             _data = data;
             Id = id;
             _myCrashEpoch = crash_ts;
 
-            _tmContact = new TmContact(tm_urls, tm_names);
-            _lmcontact = new LmContact(name, lm_urls, lm_names);
+            _tmContact = tmContact;
+            _lmcontact = lmContact;
 
             my_value = new Dictionary<int, List<Request>>();
             other_value = new Dictionary<int, List<Request>>();
