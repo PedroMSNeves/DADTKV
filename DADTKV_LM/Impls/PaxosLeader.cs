@@ -86,7 +86,7 @@ namespace DADTKV_LM.Impls
 
         public void CrashedServer(string name)
         {
-            _tmContact.CrashedServer(name);
+            //_tmContact.CrashedServer(name);
             //_lmcontact.CrashedServer(name);
         }
 
