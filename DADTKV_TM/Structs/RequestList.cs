@@ -114,6 +114,10 @@ namespace DADTKV_TM.Structs
         {
             return _lmContact.GetDeadNames();
         }
+        public List<string> GetAliveNames()
+        {
+            return _lmContact.GetAliveNames();
+        }
         public bool ContactSuspect(string name, Store st)
         {
             return _lmContact.ContactSuspect(name, st);

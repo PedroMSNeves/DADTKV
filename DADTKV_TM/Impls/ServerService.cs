@@ -35,5 +35,18 @@ namespace DADTKV_TM.Impls
 
             return tx;
         }
+
+        public override Task<StatusReply> Status(StatusRequest request, ServerCallContext context) // Returns task
+        {
+            return Task.FromResult(Sta(request));
+        }
+        public StatusReply Sta(StatusRequest request)
+        {
+
+            StatusReply reply = new StatusReply { TmName = _store.GetName() };
+            reply.Alive.AddRange(_store.GetAlive());
+            reply.Dead.AddRange(_store.GetDead());
+            return reply;
+        }
     }
 }

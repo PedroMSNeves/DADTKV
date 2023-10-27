@@ -224,5 +224,19 @@ namespace DADTKV_TM.Contact
             Console.WriteLine();
             return names;
         }
+        public List<string> GetAliveNames()
+        {
+            List<string> names = new List<string>();
+            for (int i = 0; i < lm_names.Count; i++)
+            {
+                if (bitmap[i])
+                {
+                    Console.Write(lm_names[i] + " ");
+                    names.Add(lm_names[i]);
+                }
+            }
+            Console.WriteLine();
+            return names;
+        }
     }
 }

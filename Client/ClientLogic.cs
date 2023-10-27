@@ -50,6 +50,6 @@ public class ClientLogic
     /// </summary>
     public void Status()
     {
-        _dadtkv.Status();
+        _dadtkv.Status(_name);
     }
 }
