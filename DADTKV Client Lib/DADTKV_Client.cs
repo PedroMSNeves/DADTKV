@@ -74,10 +74,43 @@ namespace DADTKV_Client_Lib
             Console.WriteLine("Transaction succeded!");
             return result;
         }
-        public bool Status() // por enquanto nao faz nada, visto que os servidores ainda nao dao crash
+        public void Status(string cname) // por enquanto nao faz nada, visto que os servidores ainda nao dao crash
         {
             //TODO
-            return true;
+            StatusReply reply;
+
+            if (tm == null)
+            {
+                // We calculate the server, to use, this way, to have a "good" distribuition of the clients to the servers
+                foreach (char c in cname) tm_cursor += (int)c; // calculate value of name
+                tm_cursor = tm_cursor % channels.Count(); // chooses one of the servers
+                tm = new TmService.TmServiceClient(channels[tm_cursor]);
+            }
+            try
+            {
+                reply = tm.StatusAsync(new StatusRequest()).GetAwaiter().GetResult();
+            }
+            catch (RpcException ex) when (ex.StatusCode == StatusCode.DeadlineExceeded || ex.StatusCode == StatusCode.Unavailable)
+            {
+                Console.WriteLine("ERROR: Couldn't contact Server, please try again");
+                tm_cursor = ++tm_cursor % channels.Count();
+                tm = new TmService.TmServiceClient(channels[tm_cursor]); // Changes the server to contact in the next request
+                return;
+            }
+            Console.WriteLine("SENDING SERVER NAME: " + reply.TmName);
+
+            Console.WriteLine("ALIVE SERVERS:");
+            foreach (string name in reply.Alive)
+            {
+                Console.Write(name + " ");
+            }
+            Console.WriteLine();
+            Console.WriteLine("DEAD SERVERS:");
+            foreach (string name in reply.Dead)
+            {
+                Console.Write(name + " ");
+            }
+            Console.WriteLine();
         }
 
     }

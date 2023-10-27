@@ -698,5 +698,39 @@ namespace DADTKV_TM
         {
             return _reqList.GetDeadNames();
         }
+        public List<string> GetDead()
+        {
+            List<string> dead = new List<string>();
+            lock (this)
+            {
+                dead.AddRange(GetDeadNamesLm());
+                dead.AddRange(GetDeadNamesTm());
+            }
+           
+            return dead;
+
+        }
+        public List<string> GetAliveNamesTm()
+        {
+            return _tmContact.GetAliveNames();
+        }
+        public List<string> GetAliveNamesLm()
+        {
+            return _reqList.GetAliveNames();
+        }
+        public List<string> GetAlive()
+        {
+            List<string> alive = new List<string>();
+            lock (this)
+            {
+                alive.AddRange(GetAliveNamesLm());
+                alive.AddRange(GetAliveNamesTm());
+            }
+            return alive;
+        }
+        public string GetName()
+        {
+            return _name;
+        }
     }
 }

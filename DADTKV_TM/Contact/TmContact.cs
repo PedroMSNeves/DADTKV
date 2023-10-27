@@ -332,5 +332,17 @@ namespace DADTKV_TM.Contact
             }
             return names;
         }
+        public List<string> GetAliveNames()
+        {
+            List<string> names = new List<string>();
+            for (int i = 0; i < tm_names.Count; i++)
+            {
+                if (bitmap[i])
+                {
+                    names.Add(tm_names[i]);
+                }
+            }
+            return names;
+        }
     }
 }
