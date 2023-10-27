@@ -32,10 +32,5 @@ namespace DADTKV_LM.Impls
             _data.AddRequest(new Request(request.Id, request.Keys.ToList(), request.LeaseId));
             return new LeaseReply { Ack = true };
         }
-
-        public void BroadcastLease(int epoch, List<Request> leases)
-        {
-            _tmContact.BroadLease(epoch, leases);
-        }
     }
 }

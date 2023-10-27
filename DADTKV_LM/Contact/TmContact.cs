@@ -56,7 +56,7 @@ namespace DADTKV_LM.Contact
             foreach (bool b in tm_bitmap) if (b) count++;
             return count;
         }
-        public bool BroadLease(int epoch, List<Request> leases)
+        public bool BroadLease(int epoch, List<Request> leases, ref bool killMe)
         {
             List<Grpc.Core.AsyncUnaryCall<LeaseReply>> replies = new List<Grpc.Core.AsyncUnaryCall<LeaseReply>>();
             LeaseBroadCastRequest request = new LeaseBroadCastRequest { Epoch = epoch, LmName = _name };
@@ -84,6 +84,11 @@ namespace DADTKV_LM.Contact
                 }
             }
             //if (AliveTMs() <= Majority()) return false;
+            if (AliveTMs() <= Majority())
+            {
+                killMe = true;
+                return false;
+            }
 
             for (int i = 0; i < tm_stubs.Count; i++)
             {

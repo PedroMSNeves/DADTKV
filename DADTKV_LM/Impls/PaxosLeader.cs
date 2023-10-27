@@ -125,16 +125,10 @@ namespace DADTKV_LM.Impls
                 if (_data.IsLeader) break;
 
                 epoch = _data.Epoch;
+                if (_data.GetKillMe()) return;
                 for (int i = 1; i <= epoch; i++)
                 {
                     if (_myCrashEpoch != -1 && i >= _myCrashEpoch) return;
-                    if (_crashed.ContainsKey(i))
-                    {
-                        foreach (string name in _crashed[i])
-                        {
-                            CrashedServer(name);
-                        }
-                    }
                 }
             }
             for (int i = 0; i < numTimeSlots; i++)
@@ -142,19 +136,11 @@ namespace DADTKV_LM.Impls
                 Console.WriteLine("New Paxos Instance");
                 _data.Epoch++;
 
-                epoch = _data.Epoch;          
-
+                epoch = _data.Epoch;
+                if (_data.GetKillMe()) return;
                 for (int j = 1; j <= epoch; j++)
                 {
                     if (_myCrashEpoch != -1 && j >= _myCrashEpoch) return; 
-
-                    if (_crashed.ContainsKey(j))
-                    {
-                        foreach (string name in _crashed[j])
-                        {
-                            CrashedServer(name);
-                        }
-                    }
                 }
                 Console.WriteLine("epoch: "+ epoch);
                 Thread t = new Thread(() => RunPaxosInstance(epoch));
@@ -192,24 +178,26 @@ namespace DADTKV_LM.Impls
                 {
                     Console.WriteLine("ACCEPT DONE");
                     _data.SetWriteTS(epoch, round_id);
-
+                    bool killMe = false;
                     if (other_TS[epoch] > _data.GetWriteTS(epoch))
                     {
-                        if (_tmContact.BroadLease(epoch, other_value[epoch])) 
+                        if (_tmContact.BroadLease(epoch, other_value[epoch], ref killMe)) 
                         {
                             Console.WriteLine("BROADCASTED");
                             _data.SetWriteTS(epoch, round_id);
                             break;  
                         }
+                        if (killMe) _data.KillMe();
                     }
                     else
                     {
-                        if (_tmContact.BroadLease(epoch, my_value[epoch]))
+                        if (_tmContact.BroadLease(epoch, my_value[epoch], ref killMe))
                         {
                             Console.WriteLine("BROADCASTED");
                             _data.SetWriteTS(epoch, round_id);
                             break;
                         }
+                        if (killMe) _data.KillMe();
                     }
                 }
             }

@@ -12,7 +12,7 @@ namespace DADTKV_LM
         List<Request> _requests = new List<Request>(); //requests received from TMs
         private Dictionary<int, int> read_ts;
         private Dictionary<int, int> write_ts;
-
+        private bool _killMe = false;
         public LeaseData(bool leader)
         {
             Possible_Leader = 0;
@@ -69,6 +69,12 @@ namespace DADTKV_LM
         {
             return l1.Intersect(l2).Any();
         }
+        public void KillMe()
+        {
+            _killMe = true;
+        }
+        public bool GetKillMe() { return _killMe; }
+
         public List<Request> GetMyValue()
         {
             lock (this)

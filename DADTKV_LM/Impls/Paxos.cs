@@ -118,7 +118,9 @@ namespace DADTKV_LM.Impls
                         }
                         _data.Possible_Leader = request.LeaderId;
                         //Sends the Paxos result to all TMs
-                        _tmContact.BroadLease(epoch, My_value);
+                        bool killMe = false;
+                        _tmContact.BroadLease(epoch, My_value, ref killMe);
+                        if (killMe) _data.KillMe();
                     }
                     else reply.Ack = false;
                 }
