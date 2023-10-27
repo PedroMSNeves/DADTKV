@@ -9,7 +9,7 @@ namespace ConfigParser
             Process process = new Process();
             process.StartInfo.FileName = "cmd.exe";
             string solutionDir = Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory)?.Parent?.Parent?.Parent?.Parent?.FullName ?? "";
-            process.StartInfo.Arguments = $"/c " + solutionDir + @"\" + project + @"\bin\Debug\net6.0\" + $"{project}.exe {arguments}"; 
+            process.StartInfo.Arguments = $"/c " + solutionDir + @"\" + project + @"\bin\Debug\net6.0\" + $"{project}.exe {arguments}";
             process.StartInfo.UseShellExecute = true;
             process.StartInfo.CreateNoWindow = false;
             return process;
@@ -35,7 +35,7 @@ namespace ConfigParser
             // Pass all Transaction Manager URLs to the Transaction Manager
             foreach (KeyValuePair<string, string> transactionManager in transactionManagers)
             {
-                if (transactionManager.Key != id) args += $" {transactionManager.Key} {transactionManager.Value}";                   
+                if (transactionManager.Key != id) args += $" {transactionManager.Key} {transactionManager.Value}";
             }
 
             args += " LM";
@@ -45,7 +45,7 @@ namespace ConfigParser
             {
                 args += $" {leaseManager.Key} {leaseManager.Value}";
             }
-            
+
             // Pass all suspected processes to the Transaction Manager
             args += " SP";
             foreach (KeyValuePair<int, List<string>> suspectedProcessesPair in suspectedProcesses)
@@ -56,7 +56,7 @@ namespace ConfigParser
                     args += $" {suspectedProcess}";
                 }
             }
-            
+
             // Pass all crashed processes to the Transaction Manager
             args += " CP";
             foreach (KeyValuePair<int, List<string>> crashedProcessesPair in crashedProcesses)
@@ -79,7 +79,7 @@ namespace ConfigParser
             // Pass all Lease Manager URLs to the Lease Manager
             foreach (KeyValuePair<string, string> leaseManager in leaseManagers)
             {
-                if (leaseManager.Key != id) args += $" {leaseManager.Key} {leaseManager.Value}";                   
+                if (leaseManager.Key != id) args += $" {leaseManager.Key} {leaseManager.Value}";
             }
 
             args += " TM";
@@ -89,7 +89,7 @@ namespace ConfigParser
             {
                 args += $" {transactionManager.Key} {transactionManager.Value}";
             }
-            
+
             // Pass all suspected processes to the Lease Manager
             args += " SP";
             foreach (KeyValuePair<int, List<string>> suspectedProcessesPair in suspectedProcesses)
@@ -100,7 +100,7 @@ namespace ConfigParser
                     args += $" {suspectedProcess}";
                 }
             }
-            
+
             // Pass all crashed processes to the Lease Manager
             args += " CP";
             foreach (KeyValuePair<int, List<string>> crashedProcessesPair in crashedProcesses)
@@ -121,7 +121,7 @@ namespace ConfigParser
             int numTimeSlots = 0;
             string startingTime = "00:00:00";
             int timeSlotDuration = 0;
-            
+
             int count = 0;
             Dictionary<int, string> serverProcesses = new Dictionary<int, string>();
             Dictionary<string, int> serverCrashTimeslots = new Dictionary<string, int>();
@@ -208,7 +208,7 @@ namespace ConfigParser
                         {
                             string serverId = serverProcesses[i - 2];
                             serverCrashTimeslots.Add(serverId, timeSlot);
-                            
+
                             if (!crashedProcesses.ContainsKey(timeSlot))
                             {
                                 crashedProcesses.Add(timeSlot, new List<string>());
@@ -216,7 +216,7 @@ namespace ConfigParser
                             crashedProcesses[timeSlot].Add(serverId);
                         }
                     }
-                    
+
                     for (int i = 2 + serverProcesses.Count; i < words.Length; i++)
                     {
                         string[] suspectedProcessesPair = words[i].Split(',');
