@@ -39,7 +39,7 @@ namespace DADTKV_TM.Impls
             bool exists = false;
 
             // Verification to deny response to dead Lms
-            //foreach (string name in _store.GetDeadNamesLm()) if (name == request.LmName) throw new RpcException(new Status(StatusCode.Aborted, "You are dead"));
+            foreach (string name in _store.GetDeadNamesLm()) if (name == request.LmName) throw new RpcException(new Status(StatusCode.Aborted, "You are dead"));
 
             lock (waitLeases)
             {
