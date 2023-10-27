@@ -96,7 +96,7 @@ namespace DADTKV_TM.Impls
         }
         public BroadReply KillS(KillRequestTm request)
         {
-            store.CrashedServer(request.TmName);
+            store.AddKillSuspected(request.TmName);
             return new BroadReply { Ack = true };
         }
     }

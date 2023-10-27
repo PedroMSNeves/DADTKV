@@ -34,6 +34,18 @@ namespace DADTKV_TM.Contact
             for (int i = 0; i < bitmap.Length; i++) bitmap[i] = true;
         }
 
+        public void initStubs()
+        {
+            if (lm_stubs == null)
+            {
+                lm_stubs = new List<LeaseService.LeaseServiceClient>();
+                foreach (GrpcChannel channel in lm_channels)
+                {
+                    lm_stubs.Add(new LeaseService.LeaseServiceClient(channel));
+                }
+            }
+        }
+
         /// <summary>
         /// Puts the server down
         /// </summary>
@@ -44,6 +56,7 @@ namespace DADTKV_TM.Contact
             {
                 if (lm_names[i] == name)
                 {
+                    Console.WriteLine("KILL:" + name);
                     bitmap[i] = false;
                     break;
                 }
@@ -62,7 +75,7 @@ namespace DADTKV_TM.Contact
                 {
                     if (bitmap[i])
                     {
-                        //return PingSuspect(i, st);
+                        return PingSuspect(i, st);
                     }
                 }
             }
@@ -70,9 +83,9 @@ namespace DADTKV_TM.Contact
         }
         public bool PingSuspect(int index, Store st)
         {
+            initStubs();
             Grpc.Core.AsyncUnaryCall<PingLm> ping = lm_stubs[index].PingSuspectAsync(new PingLm(), new CallOptions(deadline: DateTime.UtcNow.AddSeconds(10)));
             Random rd = new Random();
-
             while (true)
             {
                 Monitor.Wait(st, rd.Next(100, 150));
@@ -89,6 +102,7 @@ namespace DADTKV_TM.Contact
             KillRequestLm request = new KillRequestLm { TmName = name };
             int acks = 0;
             int responses = 0;
+            initStubs();
             for (int i = 0; i < lm_names.Count; i++)
             {
 
@@ -135,14 +149,7 @@ namespace DADTKV_TM.Contact
             int acks = 0;
             int responses = 0;
             // Initializes lm_stubs
-            if (lm_stubs == null)
-            {
-                lm_stubs = new List<LeaseService.LeaseServiceClient>();
-                foreach (GrpcChannel channel in lm_channels)
-                {
-                    lm_stubs.Add(new LeaseService.LeaseServiceClient(channel));
-                }
-            }
+            initStubs();
             // If true, we will never be able to reach consensus
             if (LmAlive() <= Majority())
             {
@@ -205,13 +212,16 @@ namespace DADTKV_TM.Contact
         public List<string> GetDeadNames()
         {
             List<string> names = new List<string>();
+            Console.WriteLine("PRINT DEAD NAMES");
             for (int i = 0; i < lm_names.Count; i++)
             {
                 if (!bitmap[i])
                 {
+                    Console.Write(lm_names[i] + " ");
                     names.Add(lm_names[i]);
                 }
             }
+            Console.WriteLine();
             return names;
         }
     }

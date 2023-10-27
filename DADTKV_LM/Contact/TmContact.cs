@@ -113,7 +113,7 @@ namespace DADTKV_LM.Contact
                     {
                         if (replies[i].ResponseAsync.IsCompleted)
                         {
-                            if (replies[i].ResponseAsync.IsFaulted)
+                            if (replies[i].ResponseAsync.IsFaulted || replies[i].ResponseAsync.IsCanceled)
                             {
                                 tm_bitmap[i] = false;
                             }

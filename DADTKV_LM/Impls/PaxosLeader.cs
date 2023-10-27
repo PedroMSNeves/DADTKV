@@ -17,7 +17,7 @@ namespace DADTKV_LM.Impls
         Dictionary<int, int> other_TS;
         public Dictionary<int, List<string>> _crashed;
         int _myCrashEpoch;
-
+        int _lastEpochUsed = 0;
         public PaxosLeader(string name, LeaseData data, int id, int crash_ts, TmContact tmContact, LmContact lmContact, Dictionary<int, List<string>> crashedP)
         {
             _name = name;
@@ -84,11 +84,6 @@ namespace DADTKV_LM.Impls
         public void SetOtherTS(int epoch, int val) { lock (this) { other_TS[epoch] = val; } }
         public int Id { get; set; }
 
-        public void CrashedServer(string name)
-        {
-            //_tmContact.CrashedServer(name);
-            //_lmcontact.CrashedServer(name);
-        }
 
         /// <summary>
         /// LMs wait until they are leaders
@@ -127,10 +122,11 @@ namespace DADTKV_LM.Impls
 
                 epoch = _data.Epoch;
                 if (_data.GetKillMe()) return;
-                for (int i = 1; i <= epoch; i++)
+                for (int i = _lastEpochUsed + 1; i <= epoch; i++)
                 {
                     if (_myCrashEpoch != -1 && i >= _myCrashEpoch) return;
                 }
+                _lastEpochUsed = epoch;
             }
             for (int i = 0; i < numTimeSlots; i++)
             {
@@ -139,10 +135,11 @@ namespace DADTKV_LM.Impls
 
                 epoch = _data.Epoch;
                 if (_data.GetKillMe()) return;
-                for (int j = 1; j <= epoch; j++)
+                for (int j = _lastEpochUsed + 1; j <= epoch; j++)
                 {
                     if (_myCrashEpoch != -1 && j >= _myCrashEpoch) return; 
                 }
+                _lastEpochUsed = epoch;
                 Console.WriteLine("epoch: "+ epoch);
                 Thread t = new Thread(() => RunPaxosInstance(epoch));
                 t.Start();               

@@ -27,9 +27,31 @@ namespace DADTKV_LM.Impls
         public LeaseReply Ls(LeaseRequest request)
         {
             Console.WriteLine("NEW REQUEST: " + request.ToString());
-            //if (_tmContact.Alive(request.Id)) return new LeaseReply { Ack = false };
+            if (!_tmContact.Alive(request.Id)) throw new RpcException(new Status(StatusCode.Aborted, "You are dead"));
 
             _data.AddRequest(new Request(request.Id, request.Keys.ToList(), request.LeaseId));
+            return new LeaseReply { Ack = true };
+        }
+        public override Task<PingLm> PingSuspect(PingLm request, ServerCallContext context)
+        {
+            return Task.FromResult(PingS());
+        }
+        public PingLm PingS()
+        {
+            return new PingLm();
+        }
+
+        public override Task<LeaseReply> KillSuspect(KillRequestLm request, ServerCallContext context)
+        {
+            return Task.FromResult(KillS(request));
+        }
+        public LeaseReply KillS(KillRequestLm request)
+        {
+            lock (this)
+            {
+                _tmContact.CrashedServer(request.TmName);
+                _lmcontact.CrashedServer(request.TmName);
+            }
             return new LeaseReply { Ack = true };
         }
     }
