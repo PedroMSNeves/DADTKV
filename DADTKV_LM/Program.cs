@@ -1,6 +1,7 @@
 ﻿using Grpc.Core;
 using System;
 using DADTKV_LM.Impls;
+using DADTKV_LM.Contact;
 
 namespace DADTKV_LM
 {
@@ -87,14 +88,14 @@ namespace DADTKV_LM
                     if (args[i].All(char.IsDigit))
                     {
                         currentTimeslot = int.Parse(args[i]);
-                        if (!crashed_processes.ContainsKey(currentTimeslot))
+                        if (!crashed_processes.ContainsKey(currentTimeslot + 1))
                         {
-                            crashed_processes.Add(currentTimeslot, new List<string>());
+                            crashed_processes.Add(currentTimeslot + 1, new List<string>());
                         }
                     }
                     else if (currentTimeslot != -1)
                     {
-                        crashed_processes[currentTimeslot].Add(args[i]);
+                        crashed_processes[currentTimeslot + 1].Add(args[i]);
                     }
                 }
             }
@@ -113,11 +114,13 @@ namespace DADTKV_LM
             LeaseData dt;
             if (id == 0) dt = new LeaseData(true);
             else dt = new LeaseData(false);
+            TmContact tmContact = new TmContact(args[0], tm_urls.Values.ToList(), tm_urls.Keys.ToList());
+            LmContact lmContact= new LmContact(args[0], lm_urls.Values.ToList(), lm_urls.Keys.ToList());
 
             Server server = new Server
             {
-                Services = { LeaseService.BindService(new LeageManager(args[0], dt, tm_urls.Values.ToList(), lm_urls.Values.ToList())) ,
-                            PaxosService.BindService(new Paxos(args[0], dt, tm_urls.Values.ToList(), lm_urls.Values.ToList()))},
+                Services = { LeaseService.BindService(new LeageManager(args[0], dt, tmContact, lmContact)) ,
+                            PaxosService.BindService(new Paxos(args[0], dt, tmContact, lmContact))},
                 Ports = { serverPort }
             };
 
@@ -126,7 +129,7 @@ namespace DADTKV_LM
             int numTimeSlots = Int32.Parse(args[3]);
             int timeSlotDuration = Int32.Parse(args[5]);
 
-            PaxosLeader pl = new PaxosLeader(args[0], dt, id, tm_urls.Values.ToList(), lm_urls.Values.ToList());
+            PaxosLeader pl = new PaxosLeader(args[0], dt, id, crash_ts, tmContact, lmContact, crashed_processes);
 
             Console.WriteLine("Insecure server listening on port " + my_url.Port);
             //Configuring HTTP for client connections in Register method

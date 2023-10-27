@@ -7,11 +7,13 @@ namespace DADTKV_LM.Contact
 {
     public class TmContact
     {
+        List<string> tm_names;
         List<LeaseService.LeaseServiceClient> tm_stubs = null;
         List<GrpcChannel> tm_channels = new List<GrpcChannel>();
         bool[] tm_bitmap;
+        private string _name;
 
-        public TmContact(List<string> tm_urls)
+        public TmContact(string name, List<string> tm_urls, List<string> t_names)
         {
             foreach (string url in tm_urls)
             {
@@ -24,8 +26,29 @@ namespace DADTKV_LM.Contact
                     Console.WriteLine("ERROR: Invalid Tm server url");
                 }
             }
+            _name = name;
+            tm_names = t_names;
             tm_bitmap = new bool[tm_channels.Count];
             for (int i = 0; i < tm_bitmap.Length; i++) tm_bitmap[i] = true;
+        }
+        public void CrashedServer(string name)
+        {
+            for (int i = 0; i < tm_names.Count; i++)
+            {
+                if (tm_names[i] == name)
+                {
+                    tm_bitmap[i] = false;
+                    break;
+                }
+            }
+        }
+        public bool Alive(string name)
+        {
+            for (int i = 0; i < tm_names.Count; i++)
+            {
+                if (tm_names[i] == name && tm_bitmap[i]) return true;
+            }
+            return false;
         }
         private int AliveTMs()
         {
@@ -36,7 +59,7 @@ namespace DADTKV_LM.Contact
         public bool BroadLease(int epoch, List<Request> leases)
         {
             List<Grpc.Core.AsyncUnaryCall<LeaseReply>> replies = new List<Grpc.Core.AsyncUnaryCall<LeaseReply>>();
-            LeaseBroadCastRequest request = new LeaseBroadCastRequest { Epoch = epoch };
+            LeaseBroadCastRequest request = new LeaseBroadCastRequest { Epoch = epoch, LmName = _name };
 
             int acks = 0;
             int responses = 0;
@@ -60,19 +83,24 @@ namespace DADTKV_LM.Contact
                     tm_stubs.Add(new LeaseService.LeaseServiceClient(channel));
                 }
             }
-            if (AliveTMs() <= Majority()) return false;
+            //if (AliveTMs() <= Majority()) return false;
 
             for (int i = 0; i < tm_stubs.Count; i++)
             {
+                Console.WriteLine("TM "+i+ " é branco? "+ tm_bitmap[i]);
                 if (tm_bitmap[i])
                 {
                     Console.WriteLine(request.Leases.Count);
                     replies.Add(tm_stubs[i].LeaseBroadCastAsync(request));
                     Console.WriteLine("DONE");
                 }
-                else replies.Add(null);
+                else
+                {
+                    replies.Add(null);
+                    responses++;
+                }
             }
-            while (responses < tm_stubs.Count && acks <= Majority())
+            while (responses < tm_stubs.Count)
             {
                 for (int i = 0; i < replies.Count; i++)
                 {
@@ -89,22 +117,14 @@ namespace DADTKV_LM.Contact
                                 acks++;
                             }
                             responses++;
-                            replies.Remove(replies[i]);
-                            i--;
-                            if (acks > Majority()) break;
+                            replies[i] = null;
                         }
-                    }
-                    else
-                    {
-                        responses++;
-                        replies.Remove(replies[i]);
-                        i--;
                     }
                 }
             }
             Console.Write("RESULTADO PAXOS CHEGOU AOS TMs? ");
             Console.WriteLine(acks);   
-            return acks > Majority();
+            return acks == AliveTMs();
         }
         private int Majority()
         {
